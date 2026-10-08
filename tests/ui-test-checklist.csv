@@ -1,0 +1,31 @@
+대분류,소분류,카테고리,테스트 ID,테스트 항목,대상 페이지,검증 내용,프로젝트,테스트 파일,통과 여부
+client,메인/홈,페이지 렌더링,R-01,홈페이지 렌더링,/,헤더/히어로/특장점 섹션/푸터 표시 확인,desktop+mobile,shop-ui.spec.ts,N
+client,메인/홈,네비게이션 라우팅,N-01,헤더 네비게이션 링크,/,상품→근황→공지사항→FAQ 순차 클릭 및 URL 확인,desktop,shop-ui.spec.ts,N
+client,메인/홈,네비게이션 라우팅,N-02,로그인 버튼 라우팅,/,헤더 로그인 버튼 클릭 → /login 이동 확인,desktop,shop-ui.spec.ts,N
+client,메인/홈,네비게이션 라우팅,N-03,로고 클릭 홈 라우팅,/products,로고 클릭 → / 이동 확인,desktop,shop-ui.spec.ts,N
+client,메인/홈,네비게이션 라우팅,N-04,히어로 CTA 버튼,/,상품 둘러보기 클릭 → /products 이동 확인,desktop,shop-ui.spec.ts,N
+client,메인/홈,네비게이션 라우팅,N-07,푸터 링크 라우팅,/,상품 목록/근황/공지사항/자주 묻는 질문 링크 클릭 및 URL 확인,desktop,shop-ui.spec.ts,N
+client,메인/홈,모바일 반응형,M-01,햄버거 메뉴 표시,/,모바일 뷰포트에서 햄버거 메뉴 버튼 표시 확인,mobile,shop-mobile.spec.ts,N
+client,메인/홈,모바일 반응형,M-02,모바일 메뉴 열기,/,햄버거 클릭 시 상품/근황/공지사항/FAQ/로그인 메뉴 표시 확인,mobile,shop-mobile.spec.ts,N
+client,메인/홈,모바일 반응형,M-03,모바일 메뉴 라우팅,/,모바일 메뉴에서 상품 클릭 → /products 이동 확인,mobile,shop-mobile.spec.ts,N
+client,메인/홈,모바일 반응형,M-04,모바일 히어로 표시,/,히어로 제목/상품 둘러보기/근황 보기 버튼 표시 확인,mobile,shop-mobile.spec.ts,N
+client,상품,페이지 렌더링,R-02,상품 목록 페이지 렌더링,/products,제목/검색 입력 필드 표시 확인,desktop+mobile,shop-ui.spec.ts,N
+client,상품,네비게이션 활성 상태,A-01,상품 탭 활성화,/products,네비 탭 bg- 클래스 적용 확인,desktop,shop-ui.spec.ts,N
+client,상품,폼 인터랙션,F-01,상품 검색 입력,/products,검색 필드에 한글 입력 및 값 반영 확인,desktop+mobile,shop-ui.spec.ts,N
+client,상품,모바일 반응형,M-05,모바일 상품 검색,/products,모바일 뷰포트에서 검색 입력 동작 확인,mobile,shop-mobile.spec.ts,N
+client,커뮤니티,페이지 렌더링,R-03,근황 페이지 렌더링,/community,제목/설명 텍스트 표시 확인,desktop+mobile,shop-ui.spec.ts,N
+client,커뮤니티,네비게이션 활성 상태,A-02,근황 탭 활성화,/community,네비 탭 bg- 클래스 적용 확인,desktop,shop-ui.spec.ts,N
+client,공지/FAQ,페이지 렌더링,R-04,공지사항 페이지 렌더링,/notices,제목/설명 텍스트 표시 확인,desktop+mobile,shop-ui.spec.ts,N
+client,공지/FAQ,페이지 렌더링,R-05,FAQ 페이지 렌더링,/faq,제목/설명 텍스트 표시 확인,desktop+mobile,shop-ui.spec.ts,N
+client,공지/FAQ,네비게이션 활성 상태,A-03,공지사항 탭 활성화,/notices,네비 탭 bg- 클래스 적용 확인,desktop,shop-ui.spec.ts,N
+client,공지/FAQ,네비게이션 활성 상태,A-04,FAQ 탭 활성화,/faq,네비 탭 bg- 클래스 적용 확인,desktop,shop-ui.spec.ts,N
+client,인증,페이지 렌더링,R-06,로그인 페이지 렌더링,/login,이메일·비밀번호 입력과 로그인 버튼 표시 확인,desktop+mobile,shop-ui.spec.ts,N
+client,장바구니,페이지 렌더링,R-07,장바구니 비로그인 안내,/cart,로그인 필요 안내 메시지 및 로그인하기 버튼 표시 확인,desktop+mobile,shop-ui.spec.ts,N
+client,장바구니,네비게이션 라우팅,N-05,장바구니 로그인 라우팅,/cart,로그인하기 버튼 클릭 → /login 이동 확인,desktop,shop-ui.spec.ts,N
+client,주문/결제,페이지 렌더링,R-09,체크아웃 빈 장바구니 안내,/checkout,주문할 상품 없음 안내/상품 둘러보기 링크 확인,desktop+mobile,shop-ui.spec.ts,N
+client,주문/결제,페이지 렌더링,R-10,주문 결과 실패 상태,/order-result,결제 실패 메시지/다시 시도하기/장바구니 버튼 확인,desktop+mobile,shop-ui.spec.ts,N
+client,주문/결제,네비게이션 라우팅,N-06,주문 결과 장바구니 라우팅,/order-result,장바구니로 돌아가기 클릭 → /cart 이동 확인,desktop,shop-ui.spec.ts,N
+client,마이페이지,페이지 렌더링,R-08,마이페이지 게스트 안내,/mypage,게스트 주문 조회 안내/주문 내역 없음 표시 확인,desktop+mobile,shop-ui.spec.ts,N
+admin,인증,페이지 렌더링,AD-01,어드민 로그인 페이지 렌더링,/admin,제목/이메일/비밀번호 필드/로그인 버튼/테스트 계정 안내 확인,desktop+mobile,admin-ui.spec.ts,N
+admin,인증,폼 인터랙션,AD-02,어드민 로그인 폼 입력,/admin,이메일/비밀번호 필드에 값 입력 및 반영 확인,desktop+mobile,admin-ui.spec.ts,N
+admin,인증,폼 인터랙션,AD-03,비밀번호 마스킹,/admin,비밀번호 필드 type=password 확인,desktop+mobile,admin-ui.spec.ts,N

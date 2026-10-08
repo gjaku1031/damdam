@@ -1,0 +1,65 @@
+# API 공통 실행 설정 (환경 변수 이름은 기존 Compose·.env와 같다)
+spring:
+  application:
+    name: damdam-api
+  # URL·계정은 DamdamEnvironmentPostProcessor가 DATABASE_URL 또는 DB_* 값으로 채운다.
+  datasource:
+    hikari:
+      connection-timeout: 5000
+      data-source-properties:
+        options: -c statement_timeout=5000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        # 따옴표로 감싼 camelCase 컬럼명("createdAt")을 그대로 사용
+        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        globally_quoted_identifiers: true
+        jdbc:
+          time_zone: UTC
+  jooq:
+    sql-dialect: postgres
+  # 로그인 세션은 PostgreSQL(SPRING_SESSION, Flyway V2)에 저장한다.
+  session:
+    timeout: 24h
+    jdbc:
+      initialize-schema: never
+  jackson:
+    # 선언하지 않은 입력 필드는 거부한다 (기존 forbidNonWhitelisted와 같은 정책)
+    deserialization:
+      fail-on-unknown-properties: true
+      accept-float-as-int: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  threads:
+    virtual:
+      enabled: true
+server:
+  address: ${HOST:0.0.0.0}
+  port: ${PORT:4000}
+  shutdown: graceful
+  servlet:
+    session:
+      cookie:
+        name: damdam.sid
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+        max-age: 24h
+        path: /
+logging:
+  level:
+    org.hibernate.orm.connections.pooling: WARN
+damdam:
+  web-origin: ${WEB_ORIGIN:http://localhost:3000}
+  trust-proxy: ${TRUST_PROXY:false}
+  seed:
+    admin-username: ${SEED_ADMIN_USERNAME:admin}
+    admin-password: ${SEED_ADMIN_PASSWORD:}
+  storage:
+    local-path: ${STORAGE_LOCAL_PATH:./uploads}
+    legacy-images-path: ${STORAGE_LEGACY_IMAGES_PATH:./legacy-images}

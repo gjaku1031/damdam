@@ -1,0 +1,11 @@
+{
+  "name": "@damdam/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Spring Boot API. pnpm 스크립트는 Gradle Wrapper를 호출합니다.",
+  "scripts": {
+    "dev": "./gradlew bootRun",
+    "build": "./gradlew --no-daemon -q bootJar",
+    "lint": "./gradlew --no-daemon -q compileJava && python3 -I ../../scripts/check-javadoc.py src/main/java"
+  }
+}

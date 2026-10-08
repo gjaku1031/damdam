@@ -1,0 +1,22 @@
+{
+  "name": "damdam-mono",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @damdam/api --filter @damdam/web dev",
+    "dev:web": "pnpm --filter @damdam/web dev",
+    "dev:api": "pnpm --filter @damdam/api dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:desktop": "playwright test --project=desktop-chrome",
+    "test:e2e:mobile": "playwright test --project=mobile-iphone",
+    "seed": "bash scripts/seed.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}

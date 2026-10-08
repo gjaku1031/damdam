@@ -1,0 +1,31 @@
+node_modules
+.pnpm-store
+.next
+dist
+coverage
+apps/api/data
+.env
+.env.*
+!.env.example
+data/
+backups/
+*.db
+*.tsbuildinfo
+uploads
+test-results
+playwright-report
+.playwright
+__pycache__/
+*.pyc
+
+# Research & design references (kept locally, not versioned)
+screenshots/
+design-samples/
+
+# Claude local-only state (may contain secrets; never commit)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# OS
+.DS_Store
+.env

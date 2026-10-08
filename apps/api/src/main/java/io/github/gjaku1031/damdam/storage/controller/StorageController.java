@@ -1,0 +1,120 @@
+package io.github.gjaku1031.damdam.storage.controller;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.gjaku1031.damdam.common.auth.AdminOnly;
+import io.github.gjaku1031.damdam.common.auth.CurrentUser;
+import io.github.gjaku1031.damdam.common.auth.SessionUser;
+import io.github.gjaku1031.damdam.common.error.ApiException;
+import io.github.gjaku1031.damdam.storage.dto.IssueTicketRequest;
+import io.github.gjaku1031.damdam.storage.dto.UploadTicketResponse;
+import io.github.gjaku1031.damdam.storage.service.ImageKeys;
+import io.github.gjaku1031.damdam.storage.service.StorageService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
+/**
+ * 사진 업로드·제공 API
+ *
+ * 업로드는 운영자 전용, 사진 제공은 {@link StorageService}의 접근 권한 판단을 따름
+ */
+@RestController
+@RequestMapping("/storage")
+@RequiredArgsConstructor
+public final class StorageController {
+    /**
+     * 사진 저장 서비스
+     */
+    private final StorageService storage;
+
+    /**
+     * 업로드 티켓 발급
+     *
+     * @return 저장 키와 만료 시각을 담은 티켓
+     */
+    @AdminOnly
+    @PostMapping("/tickets")
+    @ResponseStatus(HttpStatus.CREATED)
+    public UploadTicketResponse issue(@Valid @RequestBody IssueTicketRequest body, CurrentUser user) {
+        return storage.issueTicket(user.id(), body.domain(), body.contentType(), body.sizeBytes());
+    }
+
+    /**
+     * 티켓으로 multipart {@code file} 업로드
+     *
+     * @param file 업로드 파일, 없거나 비어 있으면 400
+     * @return {@code {objectKey}}
+     * @throws ApiException 파일이 없거나 비었을 때(400)
+     * @throws UncheckedIOException 요청 파일 읽기 실패
+     */
+    @AdminOnly
+    @PostMapping("/upload/{ticketId}")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, String> upload(@PathVariable UUID ticketId,
+            @RequestParam(value = "file", required = false) MultipartFile file, CurrentUser user) {
+        if (file == null || file.isEmpty()) throw ApiException.badRequest("사진을 선택해주세요.");
+        try {
+            return storage.upload(ticketId, file.getBytes(), String.valueOf(file.getContentType()), user.id());
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    /**
+     * 업로드 사진 제공
+     *
+     * @param domain 저장 키의 도메인 접두사
+     * @param filename 저장 키의 파일명
+     * @return 저장하지 않는 캐시 정책의 사진 응답
+     */
+    @GetMapping("/files/{domain}/{filename}")
+    public ResponseEntity<byte[]> file(@PathVariable String domain, @PathVariable String filename,
+            HttpServletRequest request) {
+        return image(filename, storage.file(domain + "/" + filename, SessionUser.id(request)));
+    }
+
+    /**
+     * 기존 정적 사진 제공
+     *
+     * @param path {@code /images/} 아래 경로, 앞의 {@code /}는 제거해 사용
+     * @return 저장하지 않는 캐시 정책의 사진 응답
+     */
+    @GetMapping("/legacy-files/{*path}")
+    public ResponseEntity<byte[]> legacyFile(@PathVariable String path, HttpServletRequest request) {
+        String filename = path.startsWith("/") ? path.substring(1) : path;
+        return image(filename, storage.legacyFile(filename, SessionUser.id(request)));
+    }
+
+    /**
+     * 사진 응답 조립
+     *
+     * 확장자로 형식을 정하고 캐시 저장 금지·MIME 추측 금지 헤더를 붙임
+     *
+     * @return 200 사진 응답
+     */
+    private static ResponseEntity<byte[]> image(String filename, byte[] data) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(ImageKeys.contentType(filename)))
+                .cacheControl(CacheControl.noStore())
+                .header("X-Content-Type-Options", "nosniff")
+                .body(data);
+    }
+}

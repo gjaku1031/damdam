@@ -1,0 +1,1 @@
+org.springframework.boot.EnvironmentPostProcessor=io.github.gjaku1031.damdam.config.DamdamEnvironmentPostProcessor
