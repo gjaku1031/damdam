@@ -39,7 +39,7 @@ function Hero() {
             fill
             priority
             sizes="(max-width: 768px) 100vw, 60vw"
-            src="/images/hero-workshop.jpg"
+            src="/brand/hero-workshop.jpg"
             alt="나무 작업대와 공구가 놓인 담담공방 작업실"
             className="object-cover"
           />
@@ -144,7 +144,7 @@ function Story() {
             unoptimized
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
-            src="/images/product-11.jpg"
+            src="/brand/serving-board.jpg"
             alt="오일로 마감한 원목 서빙 보드"
             className="object-cover"
           />

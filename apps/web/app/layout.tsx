@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     siteName: '담담공방',
     title: '담담공방 · 손으로 깎은 원목 살림',
     description,
-    images: [{ url: '/images/hero-workshop.jpg', width: 1200, height: 630, alt: '담담공방 작업실' }],
+    images: [{ url: '/brand/hero-workshop.jpg', width: 1200, height: 630, alt: '담담공방 작업실' }],
   },
   icons: {
     icon: [

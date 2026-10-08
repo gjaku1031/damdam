@@ -21,7 +21,8 @@ export async function generateMetadata({
     const cover = [...product.images].sort((a, b) => a.sortOrder - b.sortOrder)[0]?.objectKey
     const description = product.description?.slice(0, 120) || undefined
     return {
-      title: product.name,
+      // 상위 products 레이아웃의 문자열 제목이 루트 템플릿을 끊어 직접 붙임
+      title: { absolute: product.name + ' · 담담공방' },
       description,
       openGraph: {
         title: product.name,
