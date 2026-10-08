@@ -29,6 +29,20 @@ jobs:
           printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
+      # 경로 미설정·.env 없는 디렉터리에 rsync --delete를 하지 않도록 먼저 확인
+      - name: Check server path
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_PATH}" ]; then
+            echo 'ERROR: DEPLOY_PATH secret is required.' >&2
+            exit 1
+          fi
+          ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT }}" \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "test -f '${DEPLOY_PATH}/.env'" \
+            || { echo "ERROR: ${DEPLOY_PATH}/.env not found on server." >&2; exit 1; }
+
       - name: Sync repository to server
         shell: bash
         run: |
