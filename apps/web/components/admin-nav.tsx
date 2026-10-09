@@ -8,6 +8,7 @@ const links = [
   { href: '/mypage/members', label: '회원' },
   { href: '/mypage/settings', label: '설정' },
   { href: '/mypage/history', label: '운영 기록' },
+  { href: '/mypage/account', label: '계정' },
 ]
 
 /** 운영 화면 사이를 오가는 탭 */

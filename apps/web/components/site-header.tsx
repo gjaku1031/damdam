@@ -29,13 +29,8 @@ const accountLinks = [
   { href: '/mypage/account', label: '계정 설정' },
 ]
 
-const adminLinks = [
-  { href: '/mypage', label: '운영 대시보드' },
-  { href: '/mypage/orders', label: '주문 관리' },
-  { href: '/mypage/members', label: '회원 관리' },
-  { href: '/mypage/settings', label: '운영 설정' },
-  { href: '/mypage/account', label: '계정 설정' },
-]
+// 세부 운영 화면은 운영 관리 안의 탭으로 이동
+const adminLinks = [{ href: '/mypage', label: '운영 관리' }]
 
 export function SiteHeader() {
   const pathname = usePathname(),
