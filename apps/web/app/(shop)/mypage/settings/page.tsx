@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { OperatorOnly, LoadError } from '@/components/operator-only'
 import { AdminHeader } from '@/components/admin-nav'
+import { ProductCategoryCard } from '@/components/product-categories'
 import { ListSkeleton } from '@/components/ui-kit'
 import { useApi } from '@/hooks/use-api'
 import { mutate } from '@/lib/api'
@@ -105,7 +106,7 @@ function Settings() {
     : null
   return (
     <div className="page">
-      <AdminHeader title="운영 설정" description="결제 수단은 무통장 입금입니다. 고객에게 보이는 안내 정보를 관리합니다." />
+      <AdminHeader title="운영 설정" description="결제 수단은 무통장 입금입니다. 고객에게 보이는 안내 정보와 상품 분류를 관리합니다." />
       {configs.error && <LoadError message={configs.error} onRetry={configs.reload} />}
       {configs.loading && <ListSkeleton rows={3} />}
       {configs.data && (
@@ -113,6 +114,7 @@ function Settings() {
           {[...sections, ...(extra ? [extra] : [])].map((section) => (
             <SettingsCard key={section.title} section={section} saved={saved} onSaved={configs.reload} />
           ))}
+          <ProductCategoryCard />
         </div>
       )}
     </div>

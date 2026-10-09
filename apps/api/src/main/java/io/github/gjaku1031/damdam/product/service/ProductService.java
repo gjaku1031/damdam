@@ -72,6 +72,11 @@ public class ProductService {
     private final ProductImageRepository images;
 
     /**
+     * 상품 분류 서비스
+     */
+    private final ProductCategoryService categories;
+
+    /**
      * 업로드 사진 검증
      */
     private final StorageService storage;
@@ -212,6 +217,11 @@ public class ProductService {
      */
     private ProductResponse save(UUID id, ProductChanges changes) {
         if (changes.images() != null) changes.images().forEach(image -> storage.assertUsable(image.objectKey()));
+        // 분류는 운영자가 먼저 만든 것만 지정
+        if (changes.category() != null && !changes.category().isBlank()
+                && !categories.exists(changes.category().trim())) {
+            throw ApiException.badRequest("등록된 분류를 선택해주세요.");
+        }
         UUID savedId = transaction.execute(status -> {
             ProductEntity product = id == null ? ProductEntity.draft()
                     : products.findForUpdate(id).orElseThrow(ApiException::notFound);

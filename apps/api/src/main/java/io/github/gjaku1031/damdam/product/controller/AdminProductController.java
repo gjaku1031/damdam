@@ -1,5 +1,6 @@
 package io.github.gjaku1031.damdam.product.controller;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,9 +20,12 @@ import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.web.Paging;
 import io.github.gjaku1031.damdam.product.domain.ProductSort;
 import io.github.gjaku1031.damdam.product.dto.CreateProductRequest;
+import io.github.gjaku1031.damdam.product.dto.ProductCategoryRequest;
+import io.github.gjaku1031.damdam.product.dto.ProductCategoryResponse;
 import io.github.gjaku1031.damdam.product.dto.ProductPage;
 import io.github.gjaku1031.damdam.product.dto.ProductResponse;
 import io.github.gjaku1031.damdam.product.dto.UpdateProductRequest;
+import io.github.gjaku1031.damdam.product.service.ProductCategoryService;
 import io.github.gjaku1031.damdam.product.service.ProductService;
 import io.github.gjaku1031.damdam.system.domain.AdminAuditAction;
 import io.github.gjaku1031.damdam.system.service.SystemService;
@@ -48,6 +52,11 @@ public final class AdminProductController {
     private final ProductService products;
 
     /**
+     * 상품 분류 서비스
+     */
+    private final ProductCategoryService categories;
+
+    /**
      * 운영 감사 기록
      */
     private final SystemService audit;
@@ -67,6 +76,54 @@ public final class AdminProductController {
             @RequestParam(required = false) String search, @RequestParam(required = false) String category,
             @RequestParam(required = false) String sort) {
         return products.list(false, Paging.of(page, limit, 100), search, category, ProductSort.parse(sort));
+    }
+
+    /**
+     * 전체 분류 조회
+     *
+     * @return 분류별 상품 수를 포함한 이름순 분류
+     */
+    @GetMapping("/categories")
+    public List<ProductCategoryResponse> categories() {
+        return categories.list();
+    }
+
+    /**
+     * 분류 등록 후 감사 기록
+     *
+     * @return 등록한 분류
+     */
+    @PostMapping("/categories")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ProductCategoryResponse createCategory(@Valid @RequestBody ProductCategoryRequest body, CurrentUser user) {
+        ProductCategoryResponse category = categories.create(body.name());
+        audit.log(user.id(), AdminAuditAction.CREATE, TARGET, category.id().toString(), "분류 " + category.name());
+        return category;
+    }
+
+    /**
+     * 분류 이름 변경 후 감사 기록
+     *
+     * @return 변경한 분류
+     */
+    @PatchMapping("/categories/{id}")
+    public ProductCategoryResponse renameCategory(@PathVariable UUID id,
+            @Valid @RequestBody ProductCategoryRequest body, CurrentUser user) {
+        ProductCategoryResponse category = categories.rename(id, body.name());
+        audit.log(user.id(), AdminAuditAction.UPDATE, TARGET, id.toString(), "분류 이름 " + category.name());
+        return category;
+    }
+
+    /**
+     * 분류 삭제 후 감사 기록
+     *
+     * @return {@code {success: true}}
+     */
+    @DeleteMapping("/categories/{id}")
+    public Map<String, Boolean> removeCategory(@PathVariable UUID id, CurrentUser user) {
+        String name = categories.remove(id);
+        audit.log(user.id(), AdminAuditAction.DELETE, TARGET, id.toString(), "분류 " + name);
+        return Map.of("success", true);
     }
 
     /**

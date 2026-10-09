@@ -10,6 +10,7 @@ API는 Spring Boot 4(Java 25)·JPA·jOOQ·Flyway로 구성하며 컨테이너 �
 - **세션**: 로그인 세션을 PostgreSQL(Spring Session JDBC, `V2__spring_session.sql`)에 저장합니다. API를 재시작해도 로그인이 유지됩니다. 로그인·가입 시도 제한은 API 메모리 카운터라 재시작하면 초기화됩니다.
 - **결제**: 무통장 입금만 지원합니다.
 - **배송 메모·사업자 정보**: `V4__order_ship_memo.sql`이 주문에 `shipMemo`(기본 빈 문자열)를 추가합니다. 시작 시 사업자 정보·고객센터 설정 키가 빈 값으로 준비되며, 배포 후 `/mypage/settings`에서 실제 값을 입력해야 바닥글에 표시됩니다.
+- **상품 분류**: `V5__product_categories.sql`이 운영자가 관리하는 `product_categories` 테이블을 만들고, 기존 상품의 분류명(앞뒤 공백 정리)을 그대로 등록합니다. 상품은 계속 분류명을 저장하며, 분류 이름 변경·삭제 시 해당 상품의 분류명도 함께 바뀌거나 비워집니다.
 - **업로드**: API 컨테이너는 UID 1000으로 실행하고 `uploads` 볼륨에 씁니다.
 - **명령**: 기본 데이터 준비는 `docker compose run --rm api seed`, 체험 데이터는 `seed-demo --apply`입니다.
 

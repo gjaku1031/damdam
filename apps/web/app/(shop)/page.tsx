@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, Landmark, RotateCcw, Truck } from 'lucide-react'
-import { mapApiProduct, storageUrl, type ApiProduct } from '@/lib/api'
+import { mapApiProduct, type ApiProduct } from '@/lib/api'
 import { useApi } from '@/hooks/use-api'
 import { LoadError } from '@/components/operator-only'
 import { ProductCard } from '@/components/product-card'
@@ -44,61 +44,6 @@ function Hero() {
             className="object-cover"
           />
         </div>
-      </div>
-    </section>
-  )
-}
-
-function CategoryTile({ category }: { category: string }) {
-  const result = useApi<{ products: ApiProduct[] }>(
-    '/products?limit=1&category=' + encodeURIComponent(category),
-  )
-  const image = result.data?.products[0]?.images
-    .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder)[0]?.objectKey
-  return (
-    <Link
-      href={'/products?category=' + encodeURIComponent(category)}
-      className="group relative block aspect-[4/3] overflow-hidden rounded-2xl bg-muted"
-    >
-      {image ? (
-        <Image
-          unoptimized
-          fill
-          sizes="(max-width: 768px) 50vw, 25vw"
-          src={storageUrl(image)}
-          alt=""
-          className="object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-        />
-      ) : (
-        result.loading && <span className="skeleton absolute inset-0 rounded-none" />
-      )}
-      <span className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />
-      <span className="absolute bottom-3.5 left-4 flex items-center gap-1 text-[17px] font-bold text-white">
-        {category}
-        <ArrowRight className="size-4 opacity-0 transition-opacity group-hover:opacity-100" />
-      </span>
-    </Link>
-  )
-}
-
-function Categories() {
-  const result = useApi<string[]>('/products/categories')
-  const categories = (result.data ?? []).slice(0, 6)
-  if (result.error || (!result.loading && categories.length === 0)) return null
-  return (
-    <section className="mx-auto max-w-[1264px] px-4 pt-16 md:px-8 md:pt-20">
-      <h2 className="mb-6 text-2xl font-bold">분류별로 보기</h2>
-      <div
-        className={`grid grid-cols-2 gap-3 md:gap-4 ${
-          categories.length > 4 ? 'md:grid-cols-3' : 'md:grid-cols-4'
-        }`}
-      >
-        {result.loading
-          ? Array.from({ length: 4 }, (_, i) => (
-              <div key={i} className="skeleton aspect-[4/3] rounded-2xl" />
-            ))
-          : categories.map((category) => <CategoryTile key={category} category={category} />)}
       </div>
     </section>
   )
@@ -212,7 +157,6 @@ export default function HomePage() {
   return (
     <>
       <Hero />
-      <Categories />
       <NewArrivals />
       <Story />
       <Services />

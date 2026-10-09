@@ -10,7 +10,9 @@ import {
   adjustInventory,
   type ApiProduct,
   type ApiInventoryAdjustment,
+  type ProductCategory,
 } from '@/lib/api'
+import { AppSelect } from '@/components/app-select'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, ArrowRight, ImagePlus, Plus, X } from 'lucide-react'
 type Variant = {
@@ -40,12 +42,30 @@ export function ProductEditor({
     [images, setImages] = useState<string[]>([]),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
-    [uploading, setUploading] = useState(false)
+    [uploading, setUploading] = useState(false),
+    [newCategory, setNewCategory] = useState<string | null>(null)
+  const categoryList = useApi<ProductCategory[]>(open ? '/admin/products/categories' : null)
+  const categoryNames = (categoryList.data ?? []).map((c) => c.name)
+  // 예전에 자유 입력한 분류가 목록에 없어도 현재 값은 보이게 유지
+  if (category && categoryList.data && !categoryNames.includes(category)) categoryNames.push(category)
+  async function addCategory() {
+    const name = newCategory?.trim()
+    if (!name) return
+    try {
+      await mutate('/admin/products/categories', 'POST', { name })
+      categoryList.reload()
+      setCategory(name)
+      setNewCategory(null)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
   useEffect(() => {
     if (!open) return
     setName(product?.name ?? '')
     setDescription(product?.description ?? '')
     setCategory(product?.category ?? '')
+    setNewCategory(null)
     setVisible(product?.visible ?? false)
     setImages(product?.images.map((i) => i.objectKey) ?? [])
     setVariants(
@@ -140,15 +160,64 @@ export function ProductEditor({
               maxLength={200}
             />
           </label>
-          <label className="block text-sm">
-            분류
-            <input
-              className="control mt-1"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              maxLength={50}
-            />
-          </label>
+          <div className="text-sm">
+            <label className="block">
+              분류
+              <AppSelect
+                className="mt-1"
+                label="분류"
+                value={category}
+                onValueChange={setCategory}
+                options={[
+                  { value: '', label: '분류 없음' },
+                  ...categoryNames.map((n) => ({ value: n, label: n })),
+                ]}
+              />
+            </label>
+            {newCategory === null ? (
+              <button
+                type="button"
+                className="button ghost sm mt-2"
+                onClick={() => setNewCategory('')}
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                새 분류 추가
+              </button>
+            ) : (
+              <div className="mt-2 flex gap-2">
+                <input
+                  autoFocus
+                  className="control min-w-0 flex-1"
+                  aria-label="새 분류 이름"
+                  placeholder="새 분류 이름"
+                  maxLength={50}
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void addCategory()
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="button sm self-center"
+                  disabled={!newCategory.trim()}
+                  onClick={() => void addCategory()}
+                >
+                  추가
+                </button>
+                <button
+                  type="button"
+                  className="button ghost sm self-center"
+                  onClick={() => setNewCategory(null)}
+                >
+                  취소
+                </button>
+              </div>
+            )}
+          </div>
           <label className="block text-sm">
             설명
             <textarea

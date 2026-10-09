@@ -134,6 +134,7 @@ export function mapApiProduct(p: ApiProduct): Product {
 }
 export type ProductSort = 'newest' | 'price_asc' | 'price_desc' | 'name'
 export const fetchProductCategories = () => fetchApi<string[]>('/products/categories')
+export type ProductCategory = { id: string; name: string; productCount: number }
 export async function fetchProducts(options?: {
   page?: number
   limit?: number

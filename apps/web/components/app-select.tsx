@@ -56,7 +56,8 @@ export function AppSelect({
   return (
     <Select
       value={'option:' + value}
-      onValueChange={(next) => onValueChange(next.slice(7))}
+      // 폼 안에서 새 옵션이 등록되기 전 Radix가 보내는 빈 값('')은 실제 선택이 아니라 무시
+      onValueChange={(next) => next.startsWith('option:') && onValueChange(next.slice(7))}
       disabled={disabled}
     >
       <SelectTrigger
