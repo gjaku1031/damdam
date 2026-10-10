@@ -27,8 +27,10 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon -q bootJar
 FROM eclipse-temurin:25-jre AS api
 WORKDIR /app
 ENV HOST=0.0.0.0 PORT=4000
-# 컨테이너 healthcheck용 curl
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# 컨테이너 healthcheck용 curl, 업로드 사진을 크기별 WebP로 바꾸는 libvips(vips 명령)
+# 변환기가 빠진 이미지는 변환 없이 원본만 저장하므로 빌드에서 실행 여부를 확인
+RUN apt-get update && apt-get install -y --no-install-recommends curl libvips-tools && rm -rf /var/lib/apt/lists/* \
+    && vips --version
 COPY --from=api-build /src/apps/api/build/libs/damdam-api.jar ./damdam-api.jar
 COPY --chown=1000:1000 apps/web/public/images ./legacy-images
 RUN mkdir /app/uploads && chown 1000:1000 /app/uploads

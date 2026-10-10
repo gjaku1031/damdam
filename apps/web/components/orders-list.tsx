@@ -179,7 +179,7 @@ function OrderRow({
         <span className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-muted sm:size-16">
           {first?.thumbnailImageUrlSnapshot ? (
             <img
-              src={storageUrl(first.thumbnailImageUrlSnapshot)}
+              src={storageUrl(first.thumbnailImageUrlSnapshot, 's')}
               alt=""
               className="size-full object-cover"
             />
@@ -265,7 +265,7 @@ function OrderRow({
                   <span className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
                     {item.thumbnailImageUrlSnapshot && (
                       <img
-                        src={storageUrl(item.thumbnailImageUrlSnapshot)}
+                        src={storageUrl(item.thumbnailImageUrlSnapshot, 's')}
                         alt=""
                         className="size-full object-cover"
                       />

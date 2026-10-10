@@ -23,19 +23,21 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import io.github.gjaku1031.damdam.common.error.ApiException;
 import io.github.gjaku1031.damdam.config.DamdamProperties;
 import io.github.gjaku1031.damdam.feed.domain.PostState;
+import io.github.gjaku1031.damdam.storage.domain.ImageVariant;
 import io.github.gjaku1031.damdam.storage.domain.StorageUploadTicketEntity;
 import io.github.gjaku1031.damdam.storage.domain.StorageUploadTicketStatus;
 import io.github.gjaku1031.damdam.storage.domain.UploadDomain;
+import io.github.gjaku1031.damdam.storage.dto.StoredImage;
 import io.github.gjaku1031.damdam.storage.dto.UploadTicketResponse;
 import io.github.gjaku1031.damdam.storage.repository.StorageUploadTicketRepository;
 import io.github.gjaku1031.damdam.user.domain.UserEntity;
@@ -47,11 +49,19 @@ import lombok.RequiredArgsConstructor;
  *
  * 업로드 2단계
  * 1. 티켓 발급: 형식·크기를 미리 신고하고 저장 키와 만료 시각(30분)을 받음
- * 2. 파일 업로드: 실제 바이트의 서명·형식·크기가 티켓과 같을 때만 저장하고 티켓을 검증 완료로 변경
+ * 2. 파일 업로드: 실제 바이트의 서명·형식·크기가 티켓과 같을 때만 원본과 크기별 변환본({@link ImageVariant})을 저장하고
+ *    티켓을 검증 완료로 변경
+ *
+ * 사진 제공
+ * <ul>
+ *   <li>요청한 크기의 변환본을 보냄, 크기를 지정하지 않으면 대({@link ImageVariant#LARGE})</li>
+ *   <li>변환본이 없는 사진(변환기 없는 환경에서 올렸거나 일괄 변환 전)만 원본을 보냄</li>
+ *   <li>원본에는 촬영 위치 등 메타데이터가 남아 있으므로 변환본이 있으면 원본을 내보내지 않음</li>
+ * </ul>
  *
  * 사진 접근 권한 판단
- * 1. 운영자면 모든 사진 허용
- * 2. 공개된 게시글·상품·공지/FAQ 본문에 쓰인 사진이면 허용
+ * 1. 공개된 게시글·상품·공지/FAQ 본문에 쓰인 사진이면 허용, 누구에게나 같은 응답이므로 캐시 허용
+ * 2. 운영자면 모든 사진 허용
  * 3. 로그인 사용자 본인 주문의 대표 사진이면 허용
  * 4. 그 외에는 존재 여부를 숨기려고 404로 응답
  */
@@ -75,12 +85,6 @@ public class StorageService {
             Map.of("image/jpeg", ".jpg", "image/png", ".png", "image/webp", ".webp");
 
     /**
-     * 기존 정적 사진 파일명 형식
-     */
-    private static final Pattern LEGACY_FILENAME = Pattern.compile("^[\\w./-]+\\.(jpg|jpeg|png|webp)$",
-            Pattern.CASE_INSENSITIVE);
-
-    /**
      * 업로드 티켓 저장소
      */
     private final StorageUploadTicketRepository tickets;
@@ -94,6 +98,16 @@ public class StorageService {
      * 업로드 파일 저장소
      */
     private final FileStorage files;
+
+    /**
+     * 크기별 변환본 생성기
+     */
+    private final ImageConverter converter;
+
+    /**
+     * 변환이 끝난 뒤의 저장 구간만 묶는 트랜잭션 실행기
+     */
+    private final TransactionTemplate transaction;
 
     /**
      * 사진 사용처 확인·티켓 일괄 실패 처리용 jOOQ
@@ -132,39 +146,39 @@ public class StorageService {
     /**
      * 티켓으로 파일 업로드
      *
-     * 티켓 행을 잠가 같은 티켓의 동시 업로드를 막음
+     * 변환은 1초 안팎이 걸리므로 DB 트랜잭션과 티켓 잠금 밖에서 수행
      * 파일 저장 후 트랜잭션이 실패하면 티켓은 롤백되지만 저장한 파일은 남음
      *
-     * 1. 티켓 잠금 조회 후 발급자·사용 가능 여부 확인
-     * 2. 바이트 서명, 신고한 형식·크기와 실제 값 비교
-     * 3. 파일 저장 후 티켓을 검증 완료로 변경
+     * 1. 티켓의 발급자·사용 가능 여부, 바이트 서명·형식·크기 확인(잠금 없음)
+     * 2. 크기별 변환본 생성, 변환기가 없는 환경에서는 생략
+     * 3. 티켓 행을 잠가 같은 티켓의 동시 업로드를 막고 다시 확인한 뒤 원본·변환본 저장, 티켓을 검증 완료로 변경
      *
      * @param data 업로드한 파일 바이트
      * @param contentType 요청이 신고한 파일 MIME 형식
      * @param userId 업로드하는 운영자 ID
      * @return {@code {objectKey}}
-     * @throws ApiException 티켓이 없을 때(404), 발급자가 아닐 때(403), 만료·사용했거나 형식·크기가 다를 때(400)
+     * @throws ApiException 티켓이 없을 때(404), 발급자가 아닐 때(403), 만료·사용했거나 형식·크기가 다르거나 사진을 변환하지 못할 때(400)
      * @throws UncheckedIOException 파일 저장 실패
      */
-    @Transactional
     public Map<String, String> upload(UUID ticketId, byte[] data, String contentType, UUID userId) {
-        // 티켓 잠금 조회와 발급자·상태 확인
-        StorageUploadTicketEntity ticket = tickets.findForUpdate(ticketId).orElseThrow(ApiException::notFound);
-        if (!ticket.getIssuedByUserId().equals(userId)) throw ApiException.forbidden();
-        if (!ticket.isUsable(Instant.now())) throw ApiException.badRequest("만료되었거나 사용한 업로드입니다.");
-        // 실제 바이트가 티켓에 신고한 사진과 같은지 확인
-        if (!hasImageSignature(data, contentType) || !contentType.equals(ticket.getExpectedContentType())
-                || data.length != ticket.getExpectedSizeBytes() || data.length > MAX_BYTES) {
-            throw ApiException.badRequest("사진 형식 또는 실제 크기가 다릅니다.");
-        }
-        // 파일 저장 후 티켓 검증 완료
-        try {
-            files.save(ticket.getObjectKey(), data);
-        } catch (IOException error) {
-            throw new UncheckedIOException(error);
-        }
-        ticket.markVerified();
-        return Map.of("objectKey", ticket.getObjectKey());
+        // 잘못된 요청에 변환 비용을 쓰지 않도록 먼저 확인
+        assertUploadable(tickets.findById(ticketId).orElseThrow(ApiException::notFound), data, contentType, userId);
+        Map<ImageVariant, byte[]> variants = convert(data);
+        // 변환하는 동안 다른 요청이 같은 티켓을 썼을 수 있으므로 잠근 뒤 다시 확인
+        return transaction.execute(status -> {
+            StorageUploadTicketEntity ticket = tickets.findForUpdate(ticketId).orElseThrow(ApiException::notFound);
+            assertUploadable(ticket, data, contentType, userId);
+            try {
+                files.save(ticket.getObjectKey(), data);
+                for (Map.Entry<ImageVariant, byte[]> variant : variants.entrySet()) {
+                    files.save(ImageKeys.variantKey(ticket.getObjectKey(), variant.getKey()), variant.getValue());
+                }
+            } catch (IOException error) {
+                throw new UncheckedIOException(error);
+            }
+            ticket.markVerified();
+            return Map.of("objectKey", ticket.getObjectKey());
+        });
     }
 
     /**
@@ -184,47 +198,58 @@ public class StorageService {
     }
 
     /**
-     * 업로드 사진 바이트 조회
+     * 업로드 사진 조회
      *
      * @param key {@code post|product/<uuid>.<ext>} 형식의 저장 키
      * @param userId 세션 사용자 ID, 비로그인이면 빈 값
-     * @return 파일 바이트
-     * @throws ApiException 형식이 다르거나 접근할 수 없거나 파일이 없을 때(404)
+     * @param size 변환본 크기({@code s}·{@code m}·{@code l}), {@code null}이면 대
+     * @return 요청한 크기의 변환본, 변환본이 없는 사진은 원본
+     * @throws ApiException 키·크기 형식이 다르거나 접근할 수 없거나 파일이 없을 때(404)
      */
     @Transactional(readOnly = true)
-    public byte[] file(String key, Optional<UUID> userId) {
+    public StoredImage file(String key, Optional<UUID> userId, String size) {
         // 키 형식과 접근 권한을 먼저 확인해 파일 존재 여부 노출 방지
         if (!ImageKeys.UPLOADED.matcher(key).matches()) throw ApiException.notFound();
-        authorize(key, userId);
+        ImageVariant variant = variantOf(size);
+        boolean cacheable = authorize(key, userId);
+        Optional<byte[]> converted = variantBytes(key, variant);
+        if (converted.isPresent()) return new StoredImage(converted.get(), ImageKeys.VARIANT_CONTENT_TYPE, cacheable);
+        // 변환본이 없는 사진만 원본 제공
         if (!files.exists(key)) throw ApiException.notFound();
         try {
-            return files.read(key);
+            return new StoredImage(files.read(key), ImageKeys.contentType(key), cacheable);
         } catch (IOException error) {
             throw ApiException.notFound();
         }
     }
 
     /**
-     * 웹 공개 폴더에서 옮겨 온 기존 사진({@code /images/...}) 바이트 조회
+     * 웹 공개 폴더에서 옮겨 온 기존 사진({@code /images/...}) 조회
      *
      * @param filename {@code /images/} 아래 상대 경로
      * @param userId 세션 사용자 ID, 비로그인이면 빈 값
-     * @return 파일 바이트
-     * @throws ApiException 형식이 다르거나 기준 경로를 벗어나거나 접근할 수 없거나 파일이 없을 때(404)
+     * @param size 변환본 크기({@code s}·{@code m}·{@code l}), {@code null}이면 대
+     * @return 요청한 크기의 변환본, 변환본이 없는 사진은 원본
+     * @throws ApiException 파일명·크기 형식이 다르거나 기준 경로를 벗어나거나 접근할 수 없거나 파일이 없을 때(404)
      */
     @Transactional(readOnly = true)
-    public byte[] legacyFile(String filename, Optional<UUID> userId) {
+    public StoredImage legacyFile(String filename, Optional<UUID> userId, String size) {
         // 파일명 형식·경로 이동 검사 후 접근 권한 확인
-        if (!LEGACY_FILENAME.matcher(filename).matches() || filename.contains("..") || filename.startsWith("/")) {
+        if (!ImageKeys.LEGACY_FILENAME.matcher(filename).matches() || filename.contains("..") || filename.startsWith("/")) {
             throw ApiException.notFound();
         }
-        authorize(ImageKeys.LEGACY_PREFIX + filename, userId);
-        // 기준 경로 밖으로 벗어나는 경로 거부 후 읽기
+        ImageVariant variant = variantOf(size);
+        String key = ImageKeys.LEGACY_PREFIX + filename;
+        boolean cacheable = authorize(key, userId);
+        // 기준 경로 밖으로 벗어나는 경로 거부
         Path root = Path.of(properties.storage().legacyImagesPath()).toAbsolutePath().normalize();
         Path file = root.resolve(filename).normalize();
         if (!file.startsWith(root)) throw ApiException.notFound();
+        Optional<byte[]> converted = variantBytes(key, variant);
+        if (converted.isPresent()) return new StoredImage(converted.get(), ImageKeys.VARIANT_CONTENT_TYPE, cacheable);
+        // 변환본이 없는 사진만 원본 제공
         try {
-            return Files.readAllBytes(file);
+            return new StoredImage(Files.readAllBytes(file), ImageKeys.contentType(filename), cacheable);
         } catch (IOException missing) {
             throw ApiException.notFound();
         }
@@ -248,22 +273,80 @@ public class StorageService {
     }
 
     /**
+     * 업로드할 수 있는 티켓과 바이트인지 확인
+     *
+     * @throws ApiException 발급자가 아닐 때(403), 만료·사용했거나 서명·형식·크기가 티켓과 다를 때(400)
+     */
+    private static void assertUploadable(StorageUploadTicketEntity ticket, byte[] data, String contentType, UUID userId) {
+        if (!ticket.getIssuedByUserId().equals(userId)) throw ApiException.forbidden();
+        if (!ticket.isUsable(Instant.now())) throw ApiException.badRequest("만료되었거나 사용한 업로드입니다.");
+        // 실제 바이트가 티켓에 신고한 사진과 같은지 확인
+        if (!hasImageSignature(data, contentType) || !contentType.equals(ticket.getExpectedContentType())
+                || data.length != ticket.getExpectedSizeBytes() || data.length > MAX_BYTES) {
+            throw ApiException.badRequest("사진 형식 또는 실제 크기가 다릅니다.");
+        }
+    }
+
+    /**
+     * 크기별 변환본 생성
+     *
+     * @return 크기별 WebP 바이트, 변환기가 없는 환경에서는 빈 맵
+     * @throws ApiException 사진을 해석하지 못하거나 변환이 제한 시간을 넘겼을 때(400)
+     */
+    private Map<ImageVariant, byte[]> convert(byte[] data) {
+        if (!converter.available()) return Map.of();
+        try {
+            return converter.convert(data);
+        } catch (IOException failed) {
+            throw ApiException.badRequest("사진을 변환하지 못했습니다. 다른 사진으로 다시 시도해주세요.");
+        }
+    }
+
+    /**
+     * 요청한 크기 해석
+     *
+     * @param size 주소의 {@code size} 값, {@code null}이면 대
+     * @throws ApiException 정해 둔 크기가 아닐 때(404)
+     */
+    private static ImageVariant variantOf(String size) {
+        if (size == null) return ImageVariant.LARGE;
+        return ImageVariant.ofCode(size).orElseThrow(ApiException::notFound);
+    }
+
+    /**
+     * 저장된 변환본 읽기
+     *
+     * @param key 업로드 사진 키 또는 {@code /images/...} 경로
+     * @return 변환본 바이트, 변환본이 없거나 읽지 못하면 빈 값
+     */
+    private Optional<byte[]> variantBytes(String key, ImageVariant variant) {
+        String variantKey = ImageKeys.variantKey(key, variant);
+        if (!files.exists(variantKey)) return Optional.empty();
+        try {
+            return Optional.of(files.read(variantKey));
+        } catch (IOException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    /**
      * 사진 접근 권한 확인
      *
-     * 1. 삭제되지 않은 운영자면 통과
-     * 2. 공개 사용처 또는 본인 주문 사용처가 하나라도 있으면 통과
+     * 1. 공개 사용처가 있으면 통과, 응답이 요청자와 무관하므로 캐시 허용
+     * 2. 삭제되지 않은 운영자면 통과
+     * 3. 본인 주문 사용처가 있으면 통과
      *
      * @param key 업로드 사진 키 또는 {@code /images/...} 경로
      * @param userId 세션 사용자 ID, 비로그인이면 빈 값
+     * @return 공개 사용처에 쓰인 사진이면 참, 운영자·본인 주문으로만 볼 수 있는 사진이면 거짓
      * @throws ApiException 접근할 수 없을 때(404)
      */
-    private void authorize(String key, Optional<UUID> userId) {
+    private boolean authorize(String key, Optional<UUID> userId) {
+        if (dsl.fetchExists(selectOne().where(publiclyUsed(key)))) return true;
         Optional<UserEntity> user = userId.flatMap(users::findByIdAndDeletedAtIsNull);
-        if (user.map(UserEntity::isAdmin).orElse(false)) return;
-        // 공개 사용처와 본인 주문 사용처를 한 번의 EXISTS 조회로 확인
-        if (!dsl.fetchExists(selectOne().where(publiclyUsed(key).or(orderedBy(key, user.map(UserEntity::getId)))))) {
-            throw ApiException.notFound();
-        }
+        if (user.map(UserEntity::isAdmin).orElse(false)) return false;
+        if (!dsl.fetchExists(selectOne().where(orderedBy(key, user.map(UserEntity::getId))))) throw ApiException.notFound();
+        return false;
     }
 
     /**

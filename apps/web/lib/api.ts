@@ -73,8 +73,18 @@ export interface SiteInfo {
   paymentDueDays: number
 }
 export const fetchSiteInfo = () => fetchApi<SiteInfo>('/site')
-export function storageUrl(key: string) {
-  return key.startsWith('/images/') ? key : API_BASE + '/storage/files/' + key.replace(/^\//, '')
+/** 서버가 올릴 때 만들어 둔 사진 크기. 가로 최대 s 400px, m 800px, l 1600px */
+export type ImageSize = 's' | 'm' | 'l'
+/**
+ * 사진 키의 주소. 크기를 생략하면 서버가 대(l)를 보냄.
+ * `next/image`에는 크기 없이 넘김. 이미지 로더(`lib/image-loader.ts`)가 세 벌을 후보로 넣음.
+ * 크기가 고정된 작은 `<img>` 썸네일은 `'s'`를 직접 지정함.
+ */
+export function storageUrl(key: string, size?: ImageSize) {
+  const url = key.startsWith('/images/')
+    ? key
+    : API_BASE + '/storage/files/' + key.replace(/^\//, '')
+  return size ? `${url}?size=${size}` : url
 }
 export interface ApiProductVariant {
   id: string

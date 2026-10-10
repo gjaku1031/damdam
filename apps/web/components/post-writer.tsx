@@ -540,13 +540,13 @@ function Writer({ id }: { id: string }) {
                 ...keys.map((key, i) => ({
                   value: key,
                   label: `사진 ${i + 1}`,
-                  image: storageUrl(key),
+                  image: storageUrl(key, 's'),
                 })),
               ]}
             />
             {draft.coverObjectKey && (
               <img
-                src={storageUrl(draft.coverObjectKey)}
+                src={storageUrl(draft.coverObjectKey, 's')}
                 alt="대표 이미지"
                 className="mt-1 h-20 w-32 rounded-lg object-cover"
               />

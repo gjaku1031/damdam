@@ -2,8 +2,13 @@
 const nextConfig = {
   transpilePackages: ['@damdam/ui', '@damdam/shared'],
   output: 'standalone',
+  // 사진은 API가 올릴 때 만들어 둔 세 벌(가로 400·800·1600px)을 그대로 씀.
+  // 로더가 요청 폭을 세 벌 중 하나로 바꾸므로 후보 폭도 그 셋으로 맞춤
   images: {
-    unoptimized: true,
+    loader: 'custom',
+    loaderFile: './lib/image-loader.ts',
+    imageSizes: [400],
+    deviceSizes: [800, 1600],
   },
   async redirects() {
     return [

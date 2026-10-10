@@ -193,7 +193,7 @@ function OrderResult() {
                 {item.thumbnailImageUrlSnapshot && (
                   <img
                     className="size-full object-cover"
-                    src={storageUrl(item.thumbnailImageUrlSnapshot)}
+                    src={storageUrl(item.thumbnailImageUrlSnapshot, 's')}
                     alt=""
                   />
                 )}

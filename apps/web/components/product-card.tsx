@@ -19,7 +19,6 @@ export function ProductCard({
       <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
         {product.images[0] && (
           <Image
-            unoptimized
             fill
             priority={priority}
             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"

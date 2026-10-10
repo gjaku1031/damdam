@@ -323,7 +323,7 @@ export function ProductEditor({
               {images.map((key, index) => (
                 <div key={key + index} className="w-28">
                   <img
-                    src={storageUrl(key)}
+                    src={storageUrl(key, 's')}
                     alt={'상품 사진 ' + (index + 1)}
                     className="aspect-square w-full rounded-lg object-cover"
                   />

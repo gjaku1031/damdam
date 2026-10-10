@@ -269,7 +269,6 @@ function Cover({ post, sizes }: { post: PostSummary; sizes: string }) {
     <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-muted">
       {post.coverObjectKey && (
         <Image
-          unoptimized
           fill
           sizes={sizes}
           className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"

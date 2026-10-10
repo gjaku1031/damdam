@@ -135,7 +135,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
           <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted">
             {images[photo] && (
               <Image
-                unoptimized
                 fill
                 priority
                 sizes="(max-width:768px) 100vw, 58vw"
@@ -159,7 +158,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                   onClick={() => setPhoto(index)}
                 >
                   <Image
-                    unoptimized
                     fill
                     sizes="120px"
                     src={storageUrl(image.objectKey)}

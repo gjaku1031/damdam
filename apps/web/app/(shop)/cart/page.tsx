@@ -136,7 +136,6 @@ export default function CartPage() {
                 >
                   {line.product?.images[0] && (
                     <Image
-                      unoptimized
                       fill
                       sizes="96px"
                       src={storageUrl(line.product.images[0])}

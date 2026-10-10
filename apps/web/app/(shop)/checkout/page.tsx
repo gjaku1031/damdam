@@ -365,7 +365,6 @@ export default function CheckoutPage() {
                 <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
                   {i.product?.images[0] && (
                     <Image
-                      unoptimized
                       fill
                       sizes="56px"
                       src={storageUrl(i.product.images[0])}

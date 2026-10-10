@@ -2,6 +2,7 @@ package io.github.gjaku1031.damdam.storage.controller;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,8 +25,8 @@ import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.auth.SessionUser;
 import io.github.gjaku1031.damdam.common.error.ApiException;
 import io.github.gjaku1031.damdam.storage.dto.IssueTicketRequest;
+import io.github.gjaku1031.damdam.storage.dto.StoredImage;
 import io.github.gjaku1031.damdam.storage.dto.UploadTicketResponse;
-import io.github.gjaku1031.damdam.storage.service.ImageKeys;
 import io.github.gjaku1031.damdam.storage.service.StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -35,11 +36,17 @@ import lombok.RequiredArgsConstructor;
  * 사진 업로드·제공 API
  *
  * 업로드는 운영자 전용, 사진 제공은 {@link StorageService}의 접근 권한 판단을 따름
+ * 사진 주소의 {@code size}({@code s}·{@code m}·{@code l})로 크기별 변환본을 고르고, 생략하면 대를 보냄
  */
 @RestController
 @RequestMapping("/storage")
 @RequiredArgsConstructor
 public final class StorageController {
+    /**
+     * 공개 사진의 브라우저·CDN 캐시 기간, 숨긴 사진이 캐시에 남는 시간의 상한
+     */
+    private static final Duration PUBLIC_CACHE = Duration.ofDays(1);
+
     /**
      * 사진 저장 서비스
      */
@@ -83,38 +90,42 @@ public final class StorageController {
      *
      * @param domain 저장 키의 도메인 접두사
      * @param filename 저장 키의 파일명
-     * @return 저장하지 않는 캐시 정책의 사진 응답
+     * @param size 변환본 크기, 생략하면 대
+     * @return 공개 사진은 캐시 허용, 그 외에는 저장 금지 정책의 사진 응답
      */
     @GetMapping("/files/{domain}/{filename}")
     public ResponseEntity<byte[]> file(@PathVariable String domain, @PathVariable String filename,
-            HttpServletRequest request) {
-        return image(filename, storage.file(domain + "/" + filename, SessionUser.id(request)));
+            @RequestParam(value = "size", required = false) String size, HttpServletRequest request) {
+        return image(storage.file(domain + "/" + filename, SessionUser.id(request), size));
     }
 
     /**
      * 기존 정적 사진 제공
      *
      * @param path {@code /images/} 아래 경로, 앞의 {@code /}는 제거해 사용
-     * @return 저장하지 않는 캐시 정책의 사진 응답
+     * @param size 변환본 크기, 생략하면 대
+     * @return 공개 사진은 캐시 허용, 그 외에는 저장 금지 정책의 사진 응답
      */
     @GetMapping("/legacy-files/{*path}")
-    public ResponseEntity<byte[]> legacyFile(@PathVariable String path, HttpServletRequest request) {
+    public ResponseEntity<byte[]> legacyFile(@PathVariable String path,
+            @RequestParam(value = "size", required = false) String size, HttpServletRequest request) {
         String filename = path.startsWith("/") ? path.substring(1) : path;
-        return image(filename, storage.legacyFile(filename, SessionUser.id(request)));
+        return image(storage.legacyFile(filename, SessionUser.id(request), size));
     }
 
     /**
      * 사진 응답 조립
      *
-     * 확장자로 형식을 정하고 캐시 저장 금지·MIME 추측 금지 헤더를 붙임
+     * 공개 사용처에 쓰인 사진만 하루 동안 공용 캐시를 허용하고, 운영자·본인 주문으로만 볼 수 있는 사진은 저장 금지
+     * 사진 키는 올릴 때마다 새로 만들어져 같은 주소의 내용이 바뀌지 않으므로 캐시된 응답이 다른 사진이 되는 일은 없음
      *
-     * @return 200 사진 응답
+     * @return MIME 추측 금지 헤더를 붙인 200 사진 응답
      */
-    private static ResponseEntity<byte[]> image(String filename, byte[] data) {
+    private static ResponseEntity<byte[]> image(StoredImage image) {
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(ImageKeys.contentType(filename)))
-                .cacheControl(CacheControl.noStore())
+                .contentType(MediaType.parseMediaType(image.contentType()))
+                .cacheControl(image.cacheable() ? CacheControl.maxAge(PUBLIC_CACHE).cachePublic() : CacheControl.noStore())
                 .header("X-Content-Type-Options", "nosniff")
-                .body(data);
+                .body(image.data());
     }
 }
