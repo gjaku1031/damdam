@@ -36,6 +36,7 @@ import io.github.gjaku1031.damdam.user.dto.UserResponse;
  * @param shipAddress1 기본 주소
  * @param shipAddress2 상세 주소
  * @param shipMemo 배송 메모, 없으면 빈 문자열
+ * @param paymentDueAt 입금 기한, 지나면 결제 대기 주문 자동 취소. 기한 도입 전 주문이면 {@code null}
  * @param paidAt 결제 시각, 미결제면 {@code null}
  * @param canceledAt 취소 시각, 취소 전이면 {@code null}
  * @param refundedAt 환불 시각, 환불 전이면 {@code null}
@@ -46,7 +47,8 @@ import io.github.gjaku1031.damdam.user.dto.UserResponse;
 public record OrderResponse(UUID id, Instant createdAt, Instant updatedAt, String orderNo, OrderStatus status,
         int totalAmount, int shippingCost, int finalPaymentAmount, int refundedAmount, String currency,
         OrderPaymentMethod paymentMethod, String buyerName, String buyerPhone, String shipName, String shipPhone,
-        String shipPostalCode, String shipAddress1, String shipAddress2, String shipMemo, Instant paidAt, Instant canceledAt,
+        String shipPostalCode, String shipAddress1, String shipAddress2, String shipMemo, Instant paymentDueAt, Instant paidAt,
+        Instant canceledAt,
         Instant refundedAt,
         @JsonInclude(Include.NON_NULL) List<OrderItemResponse> items,
         @JsonInclude(Include.NON_NULL) List<OrderStatusHistoryResponse> statusHistories,
@@ -76,7 +78,8 @@ public record OrderResponse(UUID id, Instant createdAt, Instant updatedAt, Strin
                 order.getStatus(), order.getTotalAmount(), order.getShippingCost(), order.getFinalPaymentAmount(),
                 order.getRefundedAmount(), order.getCurrency(), order.getPaymentMethod(), order.getBuyerName(),
                 order.getBuyerPhone(), order.getShipName(), order.getShipPhone(), order.getShipPostalCode(),
-                order.getShipAddress1(), order.getShipAddress2(), order.getShipMemo(), order.getPaidAt(), order.getCanceledAt(),
+                order.getShipAddress1(), order.getShipAddress2(), order.getShipMemo(), order.getPaymentDueAt(),
+                order.getPaidAt(), order.getCanceledAt(),
                 order.getRefundedAt(), items, statusHistories, user);
     }
 }

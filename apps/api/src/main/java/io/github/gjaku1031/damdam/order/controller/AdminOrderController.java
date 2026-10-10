@@ -13,10 +13,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.github.gjaku1031.damdam.common.auth.AdminOnly;
+import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.error.ApiException;
 import io.github.gjaku1031.damdam.common.web.Paging;
-import io.github.gjaku1031.damdam.order.domain.ChangeActorType;
 import io.github.gjaku1031.damdam.order.domain.OrderStatus;
+import io.github.gjaku1031.damdam.order.dto.ChangePaymentDueRequest;
 import io.github.gjaku1031.damdam.order.dto.OrderPage;
 import io.github.gjaku1031.damdam.order.dto.OrderResponse;
 import io.github.gjaku1031.damdam.order.dto.UpdateOrderStatusRequest;
@@ -25,9 +27,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 운영자 주문 조회·상태 변경 API
+ * 운영자 주문 조회·상태 변경·입금 기한 변경 API
  */
 @RestController
+@AdminOnly
 @RequestMapping("/admin/orders")
 @RequiredArgsConstructor
 public final class AdminOrderController {
@@ -65,11 +68,27 @@ public final class AdminOrderController {
     /**
      * 운영자 주문 상태 변경
      *
+     * 취소는 재고를 되돌리고, 전액 환불은 {@code restock}을 선택했을 때만 되돌림
+     *
      * @return 변경한 주문
      */
     @PatchMapping("/{id}/status")
-    public OrderResponse updateStatus(@PathVariable UUID id, @Valid @RequestBody UpdateOrderStatusRequest body) {
-        return orders.changeStatus(id, body.status(), ChangeActorType.ADMIN, body.reason());
+    public OrderResponse updateStatus(@PathVariable UUID id, @Valid @RequestBody UpdateOrderStatusRequest body,
+            CurrentUser user) {
+        return orders.changeStatus(id, body.status(), body.reason(), user.id(), body.restockRequested());
+    }
+
+    /**
+     * 결제 대기 주문의 입금 기한 변경
+     *
+     * 운영 기록은 서비스가 이전·새 기한과 함께 남김
+     *
+     * @return 변경한 주문
+     */
+    @PatchMapping("/{id}/payment-due")
+    public OrderResponse changePaymentDue(@PathVariable UUID id, @Valid @RequestBody ChangePaymentDueRequest body,
+            CurrentUser user) {
+        return orders.changePaymentDue(id, body.dueAt(), user.id());
     }
 
     /**

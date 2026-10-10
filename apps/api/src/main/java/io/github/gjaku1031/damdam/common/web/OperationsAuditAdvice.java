@@ -1,8 +1,9 @@
 package io.github.gjaku1031.damdam.common.web;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
@@ -24,16 +25,11 @@ import lombok.RequiredArgsConstructor;
 /**
  * 성공한 운영 변경 요청({@code /api/admin/**}, GET 제외)의 운영 기록 저장
  *
- * 상품·게시글은 서비스에서 더 구체적인 기록을 남기므로 제외(게시글 분류는 포함)
+ * 상품·게시글·주문 입금 기한 변경은 서비스에서 더 구체적인 기록을 남기므로 제외(게시글 분류는 포함)
  */
 @RestControllerAdvice
 @RequiredArgsConstructor
 public final class OperationsAuditAdvice implements ResponseBodyAdvice<Object> {
-    /**
-     * 운영 API 경로 접두사, 대소문자 무시
-     */
-    private static final Pattern ADMIN_PREFIX = Pattern.compile("^/api/admin/", Pattern.CASE_INSENSITIVE);
-
     /**
      * 경로 첫 구간별 기록용 대상 이름
      */
@@ -63,7 +59,7 @@ public final class OperationsAuditAdvice implements ResponseBodyAdvice<Object> {
      * 응답 본문을 쓰기 전에 운영 기록 저장
      *
      * 1. 인증된 운영자의 GET 아닌 {@code /api/admin/**} 요청만 대상
-     * 2. 자체 기록을 남기는 상품·게시글 경로 제외(게시글 분류는 기록)
+     * 2. 자체 기록을 남기는 상품·게시글·주문 입금 기한 경로 제외(게시글 분류는 기록)
      * 3. HTTP 메서드와 마지막 경로 구간으로 작업 종류·설명 결정 후 저장
      *
      * @param body 응답 본문
@@ -82,14 +78,18 @@ public final class OperationsAuditAdvice implements ResponseBodyAdvice<Object> {
         if (!(serverRequest instanceof ServletServerHttpRequest servlet)) return body;
         HttpServletRequest request = servlet.getServletRequest();
         CurrentUser user = AuthInterceptor.current(request);
-        String uri = request.getRequestURI();
+        List<String> segments = RequestPaths.segments(request);
         String method = request.getMethod();
-        if (user == null || !ADMIN_PREFIX.matcher(uri).find() || "GET".equals(method)) return body;
-        // 서비스가 직접 기록하는 상품·게시글 경로 제외
-        String path = ADMIN_PREFIX.matcher(uri).replaceFirst("").toLowerCase(Locale.ROOT);
-        if (path.matches("^products(/.*)?$") || path.matches("^posts(/.*)?$") && !path.matches("^posts/categories(/.*)?$")) {
+        if (user == null || !RequestPaths.isAdmin(segments) || "GET".equals(method)) return body;
+
+        // 서비스가 직접 기록하는 상품·게시글·주문 입금 기한 경로 제외
+        String path = segments.stream().skip(2).map(segment -> segment.toLowerCase(Locale.ROOT))
+                .collect(Collectors.joining("/"));
+        if (path.matches("^products(/.*)?$") || path.matches("^posts(/.*)?$") && !path.matches("^posts/categories(/.*)?$")
+                || path.matches("^orders/[^/]+/payment-due$")) {
             return body;
         }
+
         // 작업 종류: DELETE는 삭제, 상태 전환이 아닌 POST는 등록, 나머지는 수정
         String[] parts = path.split("/");
         String last = parts[parts.length - 1];

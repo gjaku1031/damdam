@@ -24,6 +24,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import io.github.gjaku1031.damdam.common.error.ApiException;
 import io.github.gjaku1031.damdam.common.web.Paging;
+import io.github.gjaku1031.damdam.inventory.domain.InventoryAdjustmentEntity;
+import io.github.gjaku1031.damdam.inventory.repository.InventoryAdjustmentRepository;
 import io.github.gjaku1031.damdam.product.domain.ProductEntity;
 import io.github.gjaku1031.damdam.product.domain.ProductImageEntity;
 import io.github.gjaku1031.damdam.product.domain.ProductSort;
@@ -70,6 +72,11 @@ public class ProductService {
      * 사진 저장소
      */
     private final ProductImageRepository images;
+
+    /**
+     * 재고 이력 저장소
+     */
+    private final InventoryAdjustmentRepository adjustments;
 
     /**
      * 상품 분류 서비스
@@ -165,20 +172,22 @@ public class ProductService {
     /**
      * 상품 등록
      *
+     * @param actorUserId 등록한 운영자 ID, 초기 재고 이력의 작업자
      * @return 등록한 상품(전체 옵션 포함)
      */
-    public ProductResponse create(ProductChanges changes) {
-        return save(null, changes);
+    public ProductResponse create(ProductChanges changes, UUID actorUserId) {
+        return save(null, changes, actorUserId);
     }
 
     /**
      * 상품 부분 수정
      *
      * @param changes {@code null} 항목은 유지
+     * @param actorUserId 수정한 운영자 ID, 새 옵션 초기 재고 이력의 작업자
      * @return 수정한 상품(전체 옵션 포함)
      */
-    public ProductResponse update(UUID id, ProductChanges changes) {
-        return save(id, changes);
+    public ProductResponse update(UUID id, ProductChanges changes, UUID actorUserId) {
+        return save(id, changes, actorUserId);
     }
 
     /**
@@ -187,7 +196,7 @@ public class ProductService {
      * @return 변경한 상품
      */
     public ProductResponse setVisible(UUID id, boolean visible) {
-        return save(id, UpdateProductRequest.visibility(visible));
+        return save(id, UpdateProductRequest.visibility(visible), null);
     }
 
     /**
@@ -212,10 +221,11 @@ public class ProductService {
      * 2단계 실패 시 상품·옵션·사진 변경이 함께 롤백됨
      *
      * @param id 수정할 상품 ID, 등록이면 {@code null}
+     * @param actorUserId 저장한 운영자 ID, 옵션을 바꾸지 않는 변경이면 {@code null}
      * @return 저장 결과
      * @throws ApiException 사진·옵션·이름이 잘못됐을 때(400), 기존 옵션 재고 변경 시도(409), 상품 없음(404)
      */
-    private ProductResponse save(UUID id, ProductChanges changes) {
+    private ProductResponse save(UUID id, ProductChanges changes, UUID actorUserId) {
         if (changes.images() != null) changes.images().forEach(image -> storage.assertUsable(image.objectKey()));
         // 분류는 운영자가 먼저 만든 것만 지정
         if (changes.category() != null && !changes.category().isBlank()
@@ -227,7 +237,7 @@ public class ProductService {
                     : products.findForUpdate(id).orElseThrow(ApiException::notFound);
             applyFields(product, changes);
             products.saveAndFlush(product);
-            if (changes.variants() != null) replaceVariants(product.getId(), changes.variants());
+            if (changes.variants() != null) replaceVariants(product.getId(), changes.variants(), actorUserId);
             if (changes.images() != null) replaceImages(product.getId(), changes.images());
             return product.getId();
         });
@@ -261,12 +271,14 @@ public class ProductService {
      * 2. 입력 ID가 중복 없이 기존 옵션만 가리키는지 확인
      * 3. 입력 순서대로 기존 옵션 수정 또는 새 옵션 생성, 기본 옵션 미지정이면 첫 옵션이 기본
      * 4. 기본 옵션 하나·판매 중 옵션 존재 검증 후, 입력에 없는 기존 옵션은 판매 중지
+     * 5. 새 옵션의 초기 재고를 재고 이력에 기록(이력 합계와 현재 재고를 같게 유지)
      *
      * 판매 중지 변경을 먼저 flush한 뒤 새 옵션을 저장해 옵션명 유일 제약과의 충돌 방지
      *
+     * @param actorUserId 초기 재고 이력의 작업자
      * @throws ApiException 옵션 ID 오류·기본 옵션 규칙 위반(400), 기존 옵션 재고 변경 시도(409)
      */
-    private void replaceVariants(UUID productId, List<VariantInput> inputs) {
+    private void replaceVariants(UUID productId, List<VariantInput> inputs, UUID actorUserId) {
         Map<UUID, ProductVariantEntity> existing = variants.findByProductForUpdate(productId).stream()
                 .collect(Collectors.toMap(ProductVariantEntity::getId, Function.identity()));
         List<UUID> suppliedIds = inputs.stream().map(VariantInput::id).filter(Objects::nonNull).toList();
@@ -304,6 +316,13 @@ public class ProductService {
                 .forEach(ProductVariantEntity::retire);
         variants.flush();
         variants.saveAllAndFlush(next);
+
+        // 새 옵션의 초기 재고 이력
+        for (ProductVariantEntity variant : next) {
+            if (!existing.containsKey(variant.getId()) && variant.getStock() > 0) {
+                adjustments.save(InventoryAdjustmentEntity.of(variant.getId(), actorUserId, variant.getStock(), "초기 재고"));
+            }
+        }
     }
 
     /**

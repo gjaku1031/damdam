@@ -144,6 +144,7 @@ public class SeedService implements ApplicationRunner {
     private static Map<String, String> defaultConfigs() {
         Map<String, String> defaults = new LinkedHashMap<>();
         defaults.put(SystemConfigEntity.BANK_TRANSFER_ACCOUNT, "무통장 입금 계좌 안내");
+        defaults.put(SystemConfigEntity.BANK_TRANSFER_DUE_DAYS, "무통장 입금 기한(일)");
         defaults.put(SystemConfigEntity.BUSINESS_NAME, "상호");
         defaults.put(SystemConfigEntity.BUSINESS_OWNER, "대표자");
         defaults.put(SystemConfigEntity.BUSINESS_NUMBER, "사업자등록번호");

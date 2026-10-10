@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.github.gjaku1031.damdam.common.auth.AdminOnly;
 import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.web.ItemPage;
 import io.github.gjaku1031.damdam.common.web.Paging;
@@ -26,6 +27,7 @@ import lombok.RequiredArgsConstructor;
  * 운영자 재고 관리 API
  */
 @RestController
+@AdminOnly
 @RequestMapping("/admin/inventory")
 @RequiredArgsConstructor
 public final class AdminInventoryController {

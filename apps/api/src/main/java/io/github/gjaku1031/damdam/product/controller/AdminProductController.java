@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.github.gjaku1031.damdam.common.auth.AdminOnly;
 import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.web.Paging;
 import io.github.gjaku1031.damdam.product.domain.ProductSort;
@@ -38,6 +39,7 @@ import lombok.RequiredArgsConstructor;
  * 비공개·판매 중지 옵션까지 조회하며 변경 작업은 운영 감사 기록을 남김
  */
 @RestController
+@AdminOnly
 @RequestMapping("/admin/products")
 @RequiredArgsConstructor
 public final class AdminProductController {
@@ -144,7 +146,7 @@ public final class AdminProductController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ProductResponse create(@Valid @RequestBody CreateProductRequest body, CurrentUser user) {
-        ProductResponse product = products.create(body);
+        ProductResponse product = products.create(body, user.id());
         audit.log(user.id(), AdminAuditAction.CREATE, TARGET, product.id().toString(), null);
         return product;
     }
@@ -157,7 +159,7 @@ public final class AdminProductController {
     @PatchMapping("/{id}")
     public ProductResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateProductRequest body,
             CurrentUser user) {
-        ProductResponse product = products.update(id, body);
+        ProductResponse product = products.update(id, body, user.id());
         audit.log(user.id(), AdminAuditAction.UPDATE, TARGET, id.toString(), null);
         return product;
     }

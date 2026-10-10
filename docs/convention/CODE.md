@@ -62,11 +62,20 @@ Java API(`apps/api`)의 접근 범위·생성자 주입·JPA 엔티티·jOOQ·nu
 - jOOQ 코드는 Flyway 마이그레이션(`src/main/resources/db/migration`)에서 생성. 생성 코드는 직접 수정하지 않고 스키마 변경은 새 마이그레이션(`V2__...sql`)으로 추가.
 - 이미 적용된 마이그레이션 파일은 수정하지 않음.
 
+## 재고와 주문 잠금
+
+- 재고 수량(`product_variants.stock`)을 바꾸는 모든 경로는 같은 트랜잭션에서 재고 이력(`inventory_adjustments`)을 함께 저장. 옵션별 이력 합계는 항상 현재 재고와 같아야 함. 새 옵션의 초기 재고도 `초기 재고` 이력으로 남김.
+- 재고 변경 전에 옵션 행을 잠금(`findForUpdate`·`findAllForUpdate`). 여러 옵션은 ID 순서로 잠금.
+- 주문 상태를 바꾸는 경로는 주문 행을 먼저 잠근 뒤 옵션 행을 잠금(주문 → 옵션). 잠근 뒤 상태·기한을 다시 확인하고 변경.
+- 시간이 지나 실행되는 작업(입금 기한 자동 취소 등)은 대상마다 별도 트랜잭션으로 처리하고, 여러 번·여러 인스턴스에서 실행돼도 결과가 같게 작성.
+
 ## 웹 계층과 오류
 
 - 오류는 `ApiException`(상태·메시지·필드)으로 던지고 `GlobalExceptionHandler`가 `{success, statusCode, message, fields?, timestamp}`로 변환.
 - `POST` 생성·명령 핸들러는 `@ResponseStatus(HttpStatus.CREATED)`. 로그인·로그아웃처럼 200이 계약인 경우만 생략.
 - 로그인 필요 핸들러는 `@LoginRequired`, 운영자 전용은 `@AdminOnly`. `/api/admin/**`은 표시와 관계없이 운영자 검사. 현재 사용자는 `CurrentUser` 매개변수로 받음.
+- 운영 컨트롤러(`/admin/**`)는 클래스에 `@AdminOnly`를 함께 붙임. 경로 검사와 표시 가운데 하나가 빠져도 다른 하나가 막도록 함.
+- 권한·기록처럼 요청 경로로 판단하는 코드는 `RequestPaths.segments`를 사용. 원본 URI(`getRequestURI`)는 퍼센트 인코딩과 `;` 경로 매개변수가 남아 있어 핸들러 매핑과 결과가 달라지므로 판단에 쓰지 않음.
 - 요청 본문은 `record` + Jakarta Validation. 선언하지 않은 필드·암묵 타입 변환은 거부됨(`JacksonConfig`).
 - 쿼리 문자열의 페이지 값은 `Paging.of`로 해석.
 

@@ -16,10 +16,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.github.gjaku1031.damdam.common.error.ApiException;
 import io.github.gjaku1031.damdam.common.web.ItemPage;
 import io.github.gjaku1031.damdam.common.web.Paging;
 import io.github.gjaku1031.damdam.system.domain.AdminAuditAction;
 import io.github.gjaku1031.damdam.system.domain.AdminAuditLogEntity;
+import io.github.gjaku1031.damdam.system.domain.PaymentDeadlinePolicy;
 import io.github.gjaku1031.damdam.system.domain.SystemConfigEntity;
 import io.github.gjaku1031.damdam.system.dto.AuditLogResponse;
 import io.github.gjaku1031.damdam.system.dto.SiteInfoResponse;
@@ -40,7 +42,8 @@ public class SystemService {
     private static final List<String> PUBLIC_KEYS = List.of(SystemConfigEntity.BUSINESS_NAME,
             SystemConfigEntity.BUSINESS_OWNER, SystemConfigEntity.BUSINESS_NUMBER, SystemConfigEntity.MAIL_ORDER_NUMBER,
             SystemConfigEntity.BUSINESS_ADDRESS, SystemConfigEntity.CS_PHONE, SystemConfigEntity.CS_HOURS,
-            SystemConfigEntity.CS_EMAIL, SystemConfigEntity.BANK_TRANSFER_ACCOUNT);
+            SystemConfigEntity.CS_EMAIL, SystemConfigEntity.BANK_TRANSFER_ACCOUNT,
+            SystemConfigEntity.BANK_TRANSFER_DUE_DAYS);
 
     /**
      * 운영 기록 저장소
@@ -125,18 +128,35 @@ public class SystemService {
     }
 
     /**
+     * 새 주문에 적용할 무통장 입금 기한 일수 조회
+     *
+     * @return 운영 설정의 일수, 설정이 없거나 비었거나 잘못됐으면 기본 일수
+     */
+    @Transactional(readOnly = true)
+    public int paymentDueDays() {
+        return PaymentDeadlinePolicy.daysOrDefault(config(SystemConfigEntity.BANK_TRANSFER_DUE_DAYS).orElse(null));
+    }
+
+    /**
      * 설정 저장
      *
      * 있으면 값·설명·수정자 갱신, 없으면 새로 추가 후 즉시 flush(응답의 수정 시각 반영)
+     * 입금 기한 일수는 비우거나(기본 일수 사용) 허용 범위의 정수만 저장
      *
      * @param key 설정 키
      * @param value 설정 값
      * @param description 설정 설명, {@code null}이면 기존 설명 유지
      * @param updatedByUserId 수정한 운영자 ID
      * @return 저장 후 설정
+     * @throws ApiException 입금 기한 일수가 허용 범위의 정수가 아닐 때(400)
      */
     @Transactional
     public SystemConfigResponse setConfig(String key, String value, String description, UUID updatedByUserId) {
+        if (SystemConfigEntity.BANK_TRANSFER_DUE_DAYS.equals(key) && !value.isBlank()
+                && PaymentDeadlinePolicy.parseDays(value).isEmpty()) {
+            throw ApiException.badRequest("입금 기한은 %d~%d일 사이의 숫자로 입력해주세요."
+                    .formatted(PaymentDeadlinePolicy.MIN_DAYS, PaymentDeadlinePolicy.MAX_DAYS));
+        }
         SystemConfigEntity config = configs.findById(key)
                 .map(existing -> {
                     existing.update(value, description, updatedByUserId);

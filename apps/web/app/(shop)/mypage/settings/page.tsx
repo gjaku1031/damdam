@@ -23,7 +23,7 @@ type Section = { title: string; summary: string; fields: FieldDef[] }
 const sections: Section[] = [
   {
     title: '입금 안내',
-    summary: '주문 화면, 주문 완료 화면, 주문 내역에서 고객에게 보여주는 무통장 입금 계좌입니다.',
+    summary: '주문 화면, 주문 완료 화면, 주문 내역에서 고객에게 보여주는 무통장 입금 계좌와 입금 기한입니다.',
     fields: [
       {
         key: 'bank_transfer_account',
@@ -32,6 +32,14 @@ const sections: Section[] = [
         hint: '은행 이름, 계좌번호, 예금주를 적어주세요. 줄을 바꿔 여러 줄로 쓸 수 있습니다.',
         placeholder: '예: 국민은행 123456-78-901234 (예금주 담담공방)',
         multiline: true,
+      },
+      {
+        key: 'bank_transfer_due_days',
+        label: '입금 기한 (일)',
+        description: '무통장 입금 기한(일)',
+        hint: '주문한 날로부터 며칠 뒤 23:59까지 입금을 기다릴지 정합니다. 1~30 사이 숫자, 비워 두면 2일입니다. 기한이 지난 주문은 자동으로 취소되고 재고가 돌아옵니다. 이미 들어온 주문의 기한은 바뀌지 않습니다.',
+        placeholder: '2',
+        type: 'number',
       },
     ],
   },

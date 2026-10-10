@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.github.gjaku1031.damdam.common.auth.AdminOnly;
 import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.web.Paging;
 import io.github.gjaku1031.damdam.user.dto.UserPage;
@@ -24,6 +25,7 @@ import lombok.RequiredArgsConstructor;
  * {@code /api/admin/**} 경로라 운영자 권한 검사가 항상 적용됨
  */
 @RestController
+@AdminOnly
 @RequestMapping("/admin/users")
 @RequiredArgsConstructor
 public final class AdminUserController {

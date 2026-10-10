@@ -30,6 +30,7 @@ import io.github.gjaku1031.damdam.order.domain.ChangeActorType;
 import io.github.gjaku1031.damdam.order.domain.OrderItemStatus;
 import io.github.gjaku1031.damdam.order.domain.OrderPaymentMethod;
 import io.github.gjaku1031.damdam.order.domain.OrderStatus;
+import io.github.gjaku1031.damdam.system.domain.PaymentDeadlinePolicy;
 import io.github.gjaku1031.damdam.user.domain.UserRole;
 import lombok.RequiredArgsConstructor;
 
@@ -239,6 +240,7 @@ public class DemoDataSeeder {
      *
      * 주문번호가 이미 있으면 사용자가 체험 중 바꾼 상태를 보존하기 위해 건너뜀
      * 생성 시각은 주문마다 하루씩 과거로, 상태 단계는 15분 간격으로 기록
+     * 결제 대기 주문의 입금 기한은 생성 시각이 아니라 체험 데이터를 만든 시각 기준(만들자마자 자동 취소되지 않게 함)
      *
      * @param variants 잠근 판매 중 옵션, 재고 차감을 반영해 갱신
      * @return 새로 만들었으면 {@code true}
@@ -291,6 +293,8 @@ public class DemoDataSeeder {
                 .set(ORDERS.SHIPPOSTALCODE, "00000")
                 .set(ORDERS.SHIPADDRESS1, "체험용 배송지 (실제 배송 없음)")
                 .set(ORDERS.SHIPADDRESS2, "담담공방 주문 흐름 확인용")
+                .set(ORDERS.PAYMENTDUEAT, PaymentDeadlinePolicy.dueAt(
+                        status == OrderStatus.PENDING_PAYMENT ? now : createdAt, PaymentDeadlinePolicy.DEFAULT_DAYS))
                 .set(ORDERS.PAIDAT, paidAt)
                 .set(ORDERS.CANCELEDAT, canceledAt)
                 .set(ORDERS.REFUNDEDAT, refunded ? updatedAt : null)

@@ -2,6 +2,7 @@ package io.github.gjaku1031.damdam.system.dto;
 
 import java.util.Map;
 
+import io.github.gjaku1031.damdam.system.domain.PaymentDeadlinePolicy;
 import io.github.gjaku1031.damdam.system.domain.SystemConfigEntity;
 
 /**
@@ -18,13 +19,14 @@ import io.github.gjaku1031.damdam.system.domain.SystemConfigEntity;
  * @param csHours 고객센터 운영 시간
  * @param csEmail 고객센터 이메일
  * @param bankInstructions 무통장 입금 계좌 안내
+ * @param paymentDueDays 무통장 입금 기한 일수, 주문일(한국 시간)에서 이 일수 뒤의 23:59까지 입금 대기
  */
 public record SiteInfoResponse(String businessName, String ownerName, String businessNumber, String mailOrderNumber,
-        String address, String csPhone, String csHours, String csEmail, String bankInstructions) {
+        String address, String csPhone, String csHours, String csEmail, String bankInstructions, int paymentDueDays) {
     /**
      * 설정 키별 값에서 생성
      *
-     * @param values 설정 키별 값, 없는 키는 빈 문자열로 처리
+     * @param values 설정 키별 값, 없는 키는 빈 문자열(입금 기한은 기본 일수)로 처리
      * @return 공개 안내
      */
     public static SiteInfoResponse of(Map<String, String> values) {
@@ -32,7 +34,8 @@ public record SiteInfoResponse(String businessName, String ownerName, String bus
                 value(values, SystemConfigEntity.BUSINESS_OWNER), value(values, SystemConfigEntity.BUSINESS_NUMBER),
                 value(values, SystemConfigEntity.MAIL_ORDER_NUMBER), value(values, SystemConfigEntity.BUSINESS_ADDRESS),
                 value(values, SystemConfigEntity.CS_PHONE), value(values, SystemConfigEntity.CS_HOURS),
-                value(values, SystemConfigEntity.CS_EMAIL), value(values, SystemConfigEntity.BANK_TRANSFER_ACCOUNT));
+                value(values, SystemConfigEntity.CS_EMAIL), value(values, SystemConfigEntity.BANK_TRANSFER_ACCOUNT),
+                PaymentDeadlinePolicy.daysOrDefault(values.get(SystemConfigEntity.BANK_TRANSFER_DUE_DAYS)));
     }
 
     /**

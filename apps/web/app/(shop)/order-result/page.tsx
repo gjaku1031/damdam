@@ -9,6 +9,7 @@ import { useAuthStore } from '@/lib/store'
 import { storageUrl, type ApiOrder, type SiteInfo } from '@/lib/api'
 import { formatPrice } from '@/lib/data'
 import { orderStatus } from '@/lib/order-status'
+import { formatPaymentDue } from '@/lib/payment-due'
 import { LoadError } from '@/components/operator-only'
 import { EmptyState, PageLoading, StatusBadge } from '@/components/ui-kit'
 
@@ -166,10 +167,17 @@ function OrderResult() {
             </dd>
             <dt className="text-muted-foreground">입금자명</dt>
             <dd className="font-medium">{order.buyerName}</dd>
+            {order.paymentDueAt && (
+              <>
+                <dt className="text-muted-foreground">입금 기한</dt>
+                <dd className="font-bold">{formatPaymentDue(order.paymentDueAt)}까지</dd>
+              </>
+            )}
           </dl>
           <p className="notice-box">
             입금자명을 주문자 이름과 같게 해주세요. 이름이 다르면 확인이 늦어질 수 있습니다.
             입금이 확인되면 제작·발송을 시작합니다.
+            {order.paymentDueAt && ' 기한까지 입금이 확인되지 않으면 주문이 자동으로 취소됩니다.'}
           </p>
         </section>
       )}

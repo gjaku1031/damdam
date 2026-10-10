@@ -5,6 +5,7 @@ import static io.github.gjaku1031.damdam.jooq.Tables.PRODUCT_IMAGES;
 import static io.github.gjaku1031.damdam.jooq.Tables.USERS;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -13,6 +14,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -22,6 +24,8 @@ import java.util.stream.Collectors;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +52,9 @@ import io.github.gjaku1031.damdam.product.domain.ProductVariantEntity;
 import io.github.gjaku1031.damdam.product.dto.ProductVariantResponse;
 import io.github.gjaku1031.damdam.product.repository.ProductRepository;
 import io.github.gjaku1031.damdam.product.repository.ProductVariantRepository;
+import io.github.gjaku1031.damdam.system.domain.AdminAuditAction;
+import io.github.gjaku1031.damdam.system.domain.PaymentDeadlinePolicy;
+import io.github.gjaku1031.damdam.system.service.SystemService;
 import io.github.gjaku1031.damdam.user.domain.UserEntity;
 import io.github.gjaku1031.damdam.user.dto.UserResponse;
 import io.github.gjaku1031.damdam.user.repository.UserRepository;
@@ -58,10 +65,17 @@ import lombok.RequiredArgsConstructor;
  *
  * 주문 생성과 취소는 옵션 행을 ID 순서로 잠근 뒤 재고 변경·재고 이력을 한 트랜잭션에서 처리
  * 동시 주문이 재고를 초과하지 않고, 실패 시 주문·재고·이력이 함께 롤백됨
+ * 재고는 주문할 때 차감하고, 입금 기한이 지난 결제 대기 주문은 자동 취소로 재고를 되돌림
+ * 주문 상태를 바꾸는 모든 경로는 주문 행을 먼저 잠근 뒤 옵션 행을 잠금(주문 → 옵션 순서)
  */
 @Service
 @RequiredArgsConstructor
 public class OrderService {
+    /**
+     * 재고 복원 이상 로거
+     */
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
+
     /**
      * 주문번호 시각 부분 형식(UTC)
      */
@@ -77,6 +91,17 @@ public class OrderService {
      * 주문번호 무작위 부분 생성기
      */
     private static final SecureRandom RANDOM = new SecureRandom();
+
+    /**
+     * 운영 기록에 쓰는 입금 기한 표시 형식(한국 시간)
+     */
+    private static final DateTimeFormatter DUE_DISPLAY = DateTimeFormatter.ofPattern("M월 d일 HH:mm", Locale.KOREA)
+            .withZone(PaymentDeadlinePolicy.SEOUL);
+
+    /**
+     * 운영 기록의 주문 대상 종류
+     */
+    private static final String AUDIT_TARGET = "ORDERS";
 
     /**
      * 주문 저장소
@@ -114,7 +139,12 @@ public class OrderService {
     private final UserRepository users;
 
     /**
-     * 목록·대표 사진 조회용 jOOQ
+     * 입금 기한 설정 조회와 운영 기록 저장
+     */
+    private final SystemService system;
+
+    /**
+     * 목록·대표 사진·기한 지난 주문 조회용 jOOQ
      */
     private final DSLContext dsl;
 
@@ -124,7 +154,7 @@ public class OrderService {
      * 1. 옵션 중복 확인
      * 2. 옵션 행을 ID 순서로 잠금(동시 주문 직렬화, 교착 방지)
      * 3. 판매 여부·재고 확인 후 서버 가격으로 합계 계산
-     * 4. 주문·주문 상품 스냅샷 저장, 재고 차감과 재고 이력, 생성 이력 기록
+     * 4. 입금 기한을 계산해 주문·주문 상품 스냅샷 저장, 재고 차감과 재고 이력, 생성 이력 기록
      *
      * @param userId 주문자 ID
      * @return 주문 상품·상태 이력을 포함한 결제 대기 주문
@@ -157,7 +187,8 @@ public class OrderService {
         }
 
         // 주문·주문 상품 저장과 재고 차감
-        OrderEntity order = orders.save(OrderEntity.place(newOrderNo(), userId, request.paymentMethodOrDefault(), total, request.contact()));
+        OrderEntity order = orders.save(OrderEntity.place(newOrderNo(), userId, request.paymentMethodOrDefault(), total,
+                request.contact(), PaymentDeadlinePolicy.dueAt(Instant.now(), system.paymentDueDays())));
         Map<UUID, String> thumbnails = thumbnails(productById.keySet());
         List<OrderItemEntity> created = new ArrayList<>();
         for (CreateOrderRequest.Item line : request.items()) {
@@ -232,17 +263,87 @@ public class OrderService {
     }
 
     /**
-     * 운영자·시스템 상태 변경
+     * 운영자 상태 변경
      *
      * 주문 행을 잠근 뒤 {@link #transition}으로 처리
      *
-     * @param actor 변경 주체
+     * @param actorUserId 변경한 운영자 ID, 재고 이력의 작업자
+     * @param restock 전액 환불 시 주문 수량을 재고로 되돌릴지 여부
      * @return 주문 상품·상태 이력을 포함한 주문
-     * @throws ApiException 주문 없음(404), 허용되지 않는 전이(409)
+     * @throws ApiException 주문 없음(404), 허용되지 않는 전이(409), 전액 환불이 아닌데 재입고 선택(400)
      */
     @Transactional
-    public OrderResponse changeStatus(UUID id, OrderStatus to, ChangeActorType actor, String reason) {
-        return transition(orders.findForUpdate(id).orElseThrow(OrderService::orderNotFound), to, actor, reason, null);
+    public OrderResponse changeStatus(UUID id, OrderStatus to, String reason, UUID actorUserId, boolean restock) {
+        if (restock && to != OrderStatus.FULLY_REFUNDED) {
+            throw ApiException.badRequest("재고로 되돌리기는 전액 환불에서만 선택할 수 있습니다.");
+        }
+        return transition(orders.findForUpdate(id).orElseThrow(OrderService::orderNotFound), to, ChangeActorType.ADMIN,
+                reason, actorUserId, restock);
+    }
+
+    /**
+     * 운영자 입금 기한 변경
+     *
+     * 주문 행을 잠가 자동 취소·입금 확인과 직렬화한 뒤 변경, 운영 기록에 이전·새 기한을 남김
+     *
+     * @param dueAt 새 입금 기한
+     * @param actorUserId 변경한 운영자 ID
+     * @return 주문 상세
+     * @throws ApiException 주문 없음(404), 결제 대기가 아님(409), 기한이 지금 이전이거나 최대 연장 범위를 넘을 때(400)
+     */
+    @Transactional
+    public OrderResponse changePaymentDue(UUID id, Instant dueAt, UUID actorUserId) {
+        OrderEntity order = orders.findForUpdate(id).orElseThrow(OrderService::orderNotFound);
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw ApiException.conflict("결제 대기 주문만 입금 기한을 바꿀 수 있습니다.");
+        }
+        Instant now = Instant.now();
+        if (!dueAt.isAfter(now)) throw ApiException.badRequest("입금 기한은 지금 이후로 정해주세요.");
+        if (dueAt.isAfter(now.plus(Duration.ofDays(PaymentDeadlinePolicy.MAX_DAYS)))) {
+            throw ApiException.badRequest("입금 기한은 %d일 이내로 정해주세요.".formatted(PaymentDeadlinePolicy.MAX_DAYS));
+        }
+        // 기한 변경과 운영 기록
+        String before = order.getPaymentDueAt() == null ? "없음" : DUE_DISPLAY.format(order.getPaymentDueAt());
+        order.changePaymentDue(dueAt);
+        system.log(actorUserId, AdminAuditAction.UPDATE, AUDIT_TARGET, order.getId().toString(),
+                "주문 %s 입금 기한 변경 %s → %s".formatted(order.getOrderNo(), before, DUE_DISPLAY.format(dueAt)));
+        return detail(order);
+    }
+
+    /**
+     * 입금 기한이 지난 결제 대기 주문 ID 조회
+     *
+     * 잠금 없이 후보만 고름, 실제 취소 여부는 {@link #cancelIfPaymentOverdue}가 주문을 잠근 뒤 다시 판단
+     *
+     * @param limit 최대 건수
+     * @return 기한이 오래 지난 순 주문 ID
+     */
+    @Transactional(readOnly = true)
+    public List<UUID> paymentOverdueOrderIds(int limit) {
+        return dsl.select(ORDERS.ID).from(ORDERS)
+                .where(ORDERS.STATUS.eq(OrderStatus.PENDING_PAYMENT.name()), ORDERS.PAYMENTDUEAT.le(Instant.now()))
+                .orderBy(ORDERS.PAYMENTDUEAT, ORDERS.ID)
+                .limit(limit)
+                .fetch(ORDERS.ID);
+    }
+
+    /**
+     * 입금 기한이 지난 주문 자동 취소
+     *
+     * 주문 하나를 하나의 트랜잭션에서 처리, 실패 시 그 주문의 상태·재고·이력이 함께 롤백됨
+     *
+     * 1. 주문 행 잠금(운영자의 입금 확인·기한 연장, 고객 취소와 직렬화)
+     * 2. 잠근 뒤에도 결제 대기 중이고 기한이 지났는지 다시 확인, 아니면 아무것도 바꾸지 않음
+     * 3. 취소 전이로 재고 복원과 재고 이력, 시스템 주체의 상태 이력 기록
+     *
+     * @return 취소했으면 {@code true}, 그사이 입금 확인·연장·취소됐거나 주문이 없으면 {@code false}
+     */
+    @Transactional
+    public boolean cancelIfPaymentOverdue(UUID id) {
+        OrderEntity order = orders.findForUpdate(id).orElse(null);
+        if (order == null || !order.isPaymentOverdue(Instant.now())) return false;
+        transition(order, OrderStatus.CANCELED, ChangeActorType.SYSTEM, "입금 기한 경과 자동 취소", null, false);
+        return true;
     }
 
     /**
@@ -260,22 +361,25 @@ public class OrderService {
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             throw ApiException.conflict("결제 대기 주문만 직접 취소할 수 있습니다.");
         }
-        return transition(order, OrderStatus.CANCELED, ChangeActorType.CUSTOMER, "고객 주문 취소", userId);
+        return transition(order, OrderStatus.CANCELED, ChangeActorType.CUSTOMER, "고객 주문 취소", userId, false);
     }
 
     /**
      * 잠긴 주문의 상태 전이
      *
      * 1. 허용 전이 확인
-     * 2. 취소면 재고 복원과 재고 이력
+     * 2. 취소, 또는 재입고를 선택한 전액 환불이면 재고 복원과 재고 이력
      * 3. 주문·주문 상품 상태와 시각 반영, 상태 이력 기록
      *
-     * @param customerId 고객 취소면 재고 이력의 작업자, 운영자 변경이면 {@code null}
+     * 취소와 전액 환불은 더 전이할 수 없는 종료 상태라 한 주문의 재고는 한 번만 복원됨
+     *
+     * @param actorUserId 재고 이력의 작업자(고객·운영자), 시스템 자동 취소면 {@code null}
+     * @param restock 전액 환불 시 재고 복원 여부, 다른 전이에서는 무시
      * @return 주문 상품·전체 상태 이력을 포함한 주문
      * @throws ApiException 허용되지 않는 전이(409)
      */
     private OrderResponse transition(OrderEntity order, OrderStatus to, ChangeActorType actor, String reason,
-            UUID customerId) {
+            UUID actorUserId, boolean restock) {
         if (!OrderTransitions.allowed(order.getStatus(), to)) {
             throw ApiException.conflict("현재 주문 상태에서 변경할 수 없습니다.");
         }
@@ -285,11 +389,15 @@ public class OrderService {
         Instant now = Instant.now();
         switch (to) {
             case CANCELED -> {
-                restoreStock(order, orderItems, customerId);
+                restoreStock(orderItems, actorUserId, (actor == ChangeActorType.SYSTEM ? "입금 기한 경과 자동 취소 " : "주문 취소 ")
+                        + order.getOrderNo());
                 order.cancel(now);
             }
             case PAID -> order.markPaid(now);
-            case FULLY_REFUNDED -> order.refundFully(now);
+            case FULLY_REFUNDED -> {
+                if (restock) restoreStock(orderItems, actorUserId, "환불 재입고 " + order.getOrderNo());
+                order.refundFully(now);
+            }
             default -> order.moveTo(to);
         }
         OrderTransitions.itemStatus(to).ifPresent(status -> orderItems.forEach(item -> item.changeStatus(status)));
@@ -303,20 +411,27 @@ public class OrderService {
     }
 
     /**
-     * 취소 수량의 옵션 재고 복원과 재고 이력 기록
+     * 주문 수량의 옵션 재고 복원과 재고 이력 기록
      *
      * 주문 생성과 같은 ID 순서로 옵션을 잠가 교착 방지
+     * 옵션을 알 수 없는 기존 주문 상품({@code variantId} 없음)은 되돌릴 재고가 없으므로 건너뛰고 경고만 남김
      *
-     * @param actorUserId 재고 이력 작업자, 운영자 변경이면 {@code null}
+     * @param actorUserId 재고 이력 작업자, 시스템 자동 취소면 {@code null}
+     * @param reason 재고 이력 사유
      */
-    private void restoreStock(OrderEntity order, List<OrderItemEntity> orderItems, UUID actorUserId) {
+    private void restoreStock(List<OrderItemEntity> orderItems, UUID actorUserId, String reason) {
         Map<UUID, ProductVariantEntity> locked = variants.findAllForUpdate(
-                        orderItems.stream().map(OrderItemEntity::getVariantId).toList()).stream()
+                        orderItems.stream().map(OrderItemEntity::getVariantId).filter(Objects::nonNull).toList()).stream()
                 .collect(Collectors.toMap(ProductVariantEntity::getId, Function.identity()));
         for (OrderItemEntity item : orderItems) {
-            locked.get(item.getVariantId()).adjustStock(item.getQuantity());
-            adjustments.save(InventoryAdjustmentEntity.of(item.getVariantId(), actorUserId, item.getQuantity(),
-                    "주문 취소 " + order.getOrderNo()));
+            ProductVariantEntity variant = locked.get(item.getVariantId());
+            if (variant == null) {
+                log.warn("주문 상품 {}의 옵션을 찾을 수 없어 재고 {}개를 되돌리지 못했습니다 ({})", item.getId(),
+                        item.getQuantity(), reason);
+                continue;
+            }
+            variant.adjustStock(item.getQuantity());
+            adjustments.save(InventoryAdjustmentEntity.of(item.getVariantId(), actorUserId, item.getQuantity(), reason));
         }
     }
 

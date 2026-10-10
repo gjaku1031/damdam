@@ -1,7 +1,6 @@
 package io.github.gjaku1031.damdam.common.auth;
 
 import java.lang.annotation.Annotation;
-import java.util.regex.Pattern;
 
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
@@ -9,6 +8,7 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import io.github.gjaku1031.damdam.common.error.ApiException;
+import io.github.gjaku1031.damdam.common.web.RequestPaths;
 import io.github.gjaku1031.damdam.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,16 +18,12 @@ import lombok.RequiredArgsConstructor;
  * 세션 사용자 확인과 운영 경로 보호
  *
  * {@code /api/admin} 이하 경로(대소문자 무관)는 컨트롤러 표시와 관계없이 운영자만 허용
+ * 경로는 핸들러 매핑과 같은 기준({@link RequestPaths})으로 판단해 인코딩·경로 매개변수로 검사를 피할 수 없게 함
  * 사용자는 매 요청 DB에서 다시 읽으므로 삭제·권한 변경이 즉시 반영됨
  */
 @Component
 @RequiredArgsConstructor
 public final class AuthInterceptor implements HandlerInterceptor {
-    /**
-     * 운영자 전용 경로, 대소문자 무시
-     */
-    private static final Pattern ADMIN_PATH = Pattern.compile("^/api/admin(?:/|$)", Pattern.CASE_INSENSITIVE);
-
     /**
      * 회원 저장소
      */
@@ -50,7 +46,7 @@ public final class AuthInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         // 인증이 필요 없는 핸들러는 통과
         if (!(handler instanceof HandlerMethod method)) return true;
-        boolean adminRequired = ADMIN_PATH.matcher(request.getRequestURI()).find() || annotated(method, AdminOnly.class);
+        boolean adminRequired = RequestPaths.isAdmin(RequestPaths.segments(request)) || annotated(method, AdminOnly.class);
         if (!adminRequired && !annotated(method, LoginRequired.class)) return true;
 
         // 세션 사용자를 DB에서 다시 읽어 현재 권한으로 판단

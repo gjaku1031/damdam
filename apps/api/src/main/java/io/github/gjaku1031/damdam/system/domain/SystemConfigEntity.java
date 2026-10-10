@@ -27,6 +27,11 @@ public class SystemConfigEntity {
     public static final String BANK_TRANSFER_ACCOUNT = "bank_transfer_account";
 
     /**
+     * 무통장 입금 기한 일수 설정 키, 값 규칙은 {@link PaymentDeadlinePolicy}
+     */
+    public static final String BANK_TRANSFER_DUE_DAYS = "bank_transfer_due_days";
+
+    /**
      * 상호 설정 키
      */
     public static final String BUSINESS_NAME = "business_name";

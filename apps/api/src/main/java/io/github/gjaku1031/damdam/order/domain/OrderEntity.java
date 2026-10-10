@@ -127,6 +127,11 @@ public class OrderEntity extends BaseEntity {
     private String shipMemo = "";
 
     /**
+     * 입금 기한, 지나면 결제 대기 주문을 자동 취소. 기한 도입 전 주문이면 {@code null}
+     */
+    private Instant paymentDueAt;
+
+    /**
      * 결제 완료 시각
      */
     private Instant paidAt;
@@ -145,10 +150,11 @@ public class OrderEntity extends BaseEntity {
      * 결제 대기 주문 생성
      *
      * @param totalAmount 서버 가격으로 계산한 상품 합계, 배송비 0원
+     * @param paymentDueAt 입금 기한
      * @return 저장 전 주문
      */
     public static OrderEntity place(String orderNo, UUID userId, OrderPaymentMethod paymentMethod, int totalAmount,
-            OrderContact contact) {
+            OrderContact contact, Instant paymentDueAt) {
         OrderEntity order = new OrderEntity();
         order.orderNo = orderNo;
         order.userId = userId;
@@ -164,6 +170,7 @@ public class OrderEntity extends BaseEntity {
         order.shipAddress1 = contact.shipAddress1();
         order.shipAddress2 = contact.shipAddress2() == null ? "" : contact.shipAddress2();
         order.shipMemo = contact.shipMemo() == null ? "" : contact.shipMemo();
+        order.paymentDueAt = paymentDueAt;
         return order;
     }
 
@@ -174,6 +181,26 @@ public class OrderEntity extends BaseEntity {
      */
     public boolean isOwnedBy(UUID userId) {
         return this.userId != null && this.userId.equals(userId);
+    }
+
+    /**
+     * 입금 기한 경과 여부
+     *
+     * @param now 기준 시각
+     * @return 결제 대기 중이고 기한이 기준 시각 이전이거나 같으면 {@code true}, 기한이 없는 주문은 {@code false}
+     */
+    public boolean isPaymentOverdue(Instant now) {
+        return status == OrderStatus.PENDING_PAYMENT && paymentDueAt != null && !paymentDueAt.isAfter(now);
+    }
+
+    /**
+     * 입금 기한 변경
+     *
+     * @throws IllegalStateException 결제 대기 주문이 아닐 때
+     */
+    public void changePaymentDue(Instant paymentDueAt) {
+        if (status != OrderStatus.PENDING_PAYMENT) throw new IllegalStateException("결제 대기 주문이 아닙니다.");
+        this.paymentDueAt = paymentDueAt;
     }
 
     /**

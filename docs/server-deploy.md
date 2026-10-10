@@ -11,6 +11,7 @@ API는 Spring Boot 4(Java 25)·JPA·jOOQ·Flyway로 구성하며 컨테이너 �
 - **결제**: 무통장 입금만 지원합니다.
 - **배송 메모·사업자 정보**: `V4__order_ship_memo.sql`이 주문에 `shipMemo`(기본 빈 문자열)를 추가합니다. 시작 시 사업자 정보·고객센터 설정 키가 빈 값으로 준비되며, 배포 후 `/mypage/settings`에서 실제 값을 입력해야 바닥글에 표시됩니다.
 - **상품 분류**: `V5__product_categories.sql`이 운영자가 관리하는 `product_categories` 테이블을 만들고, 기존 상품의 분류명(앞뒤 공백 정리)을 그대로 등록합니다. 상품은 계속 분류명을 저장하며, 분류 이름 변경·삭제 시 해당 상품의 분류명도 함께 바뀌거나 비워집니다.
+- **입금 기한·재고 보호**: `V6__payment_deadline_and_stock_guards.sql`이 주문에 `paymentDueAt`(입금 기한)을 추가하고, 이미 결제 대기 중인 주문에는 적용일 + 2일 23:59(한국 시간)를 기한으로 줍니다. 옵션 재고에 `CHECK (stock >= 0)`을 걸고, 옵션마다 재고 이력 합계와 현재 재고의 차이를 `이력 보정` 한 건으로 기록하며, 쓰지 않는 `inventory_reservations` 테이블을 삭제합니다. 음수 재고나 활성 예약이 있으면 아무것도 바꾸지 않고 시작을 중단합니다. 적용 후에는 5분마다 기한이 지난 결제 대기 주문이 자동 취소되고 재고가 돌아옵니다. 기한 일수는 `/mypage/settings`의 입금 안내에서 바꿉니다(기본 2일). V6 이전 API 이미지로 되돌리려면 `inventory_reservations` 테이블을 V1의 정의로 다시 만들어야 합니다.
 - **업로드**: API 컨테이너는 UID 1000으로 실행하고 `uploads` 볼륨에 씁니다.
 - **명령**: 기본 데이터 준비는 `docker compose run --rm api seed`, 체험 데이터는 `seed-demo --apply`입니다.
 

@@ -69,6 +69,8 @@ export interface SiteInfo {
   csHours: string
   csEmail: string
   bankInstructions: string
+  /** 주문일(한국 시간)에서 이 일수 뒤의 23:59까지 입금을 기다림 */
+  paymentDueDays: number
 }
 export const fetchSiteInfo = () => fetchApi<SiteInfo>('/site')
 export function storageUrl(key: string) {
@@ -273,6 +275,8 @@ export interface ApiOrder {
   shipAddress1: string
   shipAddress2: string
   shipMemo: string
+  /** 입금 기한. 지나면 결제 대기 주문이 자동 취소됨. 기한 도입 전 주문은 null */
+  paymentDueAt: string | null
   paidAt: string | null
   canceledAt: string | null
   refundedAt: string | null
@@ -345,11 +349,17 @@ export interface AdminDashboard {
     variantName: string
     stock: number
   }[]
+  /** 입금 기한이 오늘 안에 끝나는 결제 대기 주문 수 */
+  paymentDueTodayCount: number
 }
 export const fetchAdminDashboard = () => fetchApi<AdminDashboard>('/admin/dashboard')
 export const fetchAdminOrder = (id: string) => fetchApi<ApiOrder>('/admin/orders/' + id)
-export const updateAdminOrderStatus = (id: string, data: { status: string; reason?: string }) =>
-  mutate<ApiOrder>('/admin/orders/' + id + '/status', 'PATCH', data)
+export const updateAdminOrderStatus = (
+  id: string,
+  data: { status: string; reason?: string; restock?: boolean },
+) => mutate<ApiOrder>('/admin/orders/' + id + '/status', 'PATCH', data)
+export const changeAdminOrderPaymentDue = (id: string, dueAt: string) =>
+  mutate<ApiOrder>('/admin/orders/' + id + '/payment-due', 'PATCH', { dueAt })
 export const fetchAuditLogs = (params?: { page?: number; size?: number; target?: string }) =>
   fetchApi<{ items: ApiAuditLog[]; total: number }>(
     '/admin/system/audit-logs?page=' +

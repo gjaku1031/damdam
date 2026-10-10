@@ -350,6 +350,10 @@ export default function CheckoutPage() {
             <p className="text-sm leading-relaxed text-muted-foreground">
               입금자명을 주문자 이름과 같게 해주세요. 입금이 확인되면 제작·발송을 시작합니다.
             </p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              주문한 날로부터 {site.data?.paymentDueDays ?? 2}일 뒤 23:59까지 입금해주세요. 기한이 지나면 주문이
+              자동으로 취소됩니다.
+            </p>
           </section>
         </div>
 

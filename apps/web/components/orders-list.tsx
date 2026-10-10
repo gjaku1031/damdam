@@ -6,6 +6,13 @@ import { useApi } from '@/hooks/use-api'
 import { mutate, storageUrl, type ApiOrder, type SiteInfo } from '@/lib/api'
 import { formatPrice } from '@/lib/data'
 import { orderActionLabels, orderStatus, orderTransitions } from '@/lib/order-status'
+import {
+  formatPaymentDue,
+  maxPaymentDueDay,
+  paymentDueBadge,
+  paymentDueFromDay,
+  seoulDay,
+} from '@/lib/payment-due'
 import { confirmAction } from './confirm-dialog'
 import { StatusBadge } from './ui-kit'
 import { formatDateTime } from './admin-nav'
@@ -16,6 +23,9 @@ export const orderLabels: Record<string, string> = Object.fromEntries(
 )
 
 const dangerStatuses = new Set(['CANCELED', 'PARTIALLY_REFUNDED', 'FULLY_REFUNDED'])
+
+/** 운영자가 입금 기한을 늘릴 수 있는 최대 일수 (API PaymentDeadlinePolicy.MAX_DAYS와 같음) */
+const MAX_DUE_DAYS = 30
 
 export function OrdersList({
   orders,
@@ -57,11 +67,16 @@ function OrderRow({
   const [open, setOpen] = useState(false),
     [reason, setReason] = useState(''),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('')
+    [error, setError] = useState(''),
+    [restock, setRestock] = useState(false),
+    [dueDay, setDueDay] = useState('')
   const detail = useApi<ApiOrder>(
     open ? (operations ? '/admin/orders/' : '/orders/') + order.id : null,
   )
-  const pendingCustomer = !operations && order.status === 'PENDING_PAYMENT'
+  const pending = order.status === 'PENDING_PAYMENT'
+  const pendingCustomer = !operations && pending
+  const dueBadge = pending ? paymentDueBadge(order.paymentDueAt) : null
+  const quantity = order.items.reduce((n, i) => n + i.quantity, 0)
   const site = useApi<SiteInfo>(open && pendingCustomer ? '/site' : null)
   const first = order.items[0]
   const panelId = 'order-panel-' + order.id
@@ -72,12 +87,19 @@ function OrderRow({
 
   async function changeStatus(to: string) {
     const label = orderActionLabels[to] ?? orderStatus[to]?.label ?? to
+    const returnsStock = to === 'CANCELED' || (to === 'FULLY_REFUNDED' && restock)
+    const stockNote =
+      to === 'CANCELED' || to === 'FULLY_REFUNDED'
+        ? returnsStock
+          ? ` 주문 수량 ${quantity}개를 재고로 되돌립니다.`
+          : ' 재고는 되돌리지 않습니다.'
+        : ''
     const ok = await confirmAction({
       title: `${label} 처리할까요?`,
       description:
         to === 'PAID'
           ? `입금자 ${order.buyerName} · ${formatPrice(order.finalPaymentAmount)} 입금을 확인했는지 통장 내역과 맞춰보세요.`
-          : `주문 ${order.orderNo}의 상태를 '${orderStatus[to]?.label ?? to}'(으)로 바꿉니다.`,
+          : `주문 ${order.orderNo}의 상태를 '${orderStatus[to]?.label ?? to}'(으)로 바꿉니다.${stockNote}`,
       confirmLabel: label,
       tone: dangerStatuses.has(to) ? 'danger' : 'default',
     })
@@ -88,9 +110,30 @@ function OrderRow({
       await mutate('/admin/orders/' + order.id + '/status', 'PATCH', {
         status: to,
         reason: reason.trim() || label,
+        ...(to === 'FULLY_REFUNDED' ? { restock } : {}),
       })
       setReason('')
+      setRestock(false)
       toast.success(`${label} 처리했습니다.`)
+      detail.reload()
+      onChanged()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function changeDue(e: React.FormEvent) {
+    e.preventDefault()
+    if (!dueDay) return
+    setBusy(true)
+    setError('')
+    try {
+      const dueAt = paymentDueFromDay(dueDay)
+      await mutate('/admin/orders/' + order.id + '/payment-due', 'PATCH', { dueAt })
+      setDueDay('')
+      toast.success(`입금 기한을 ${formatPaymentDue(dueAt)}까지로 바꿨습니다.`)
       detail.reload()
       onChanged()
     } catch (e) {
@@ -147,6 +190,7 @@ function OrderRow({
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={order.status} />
+            {dueBadge && <span className={`badge ${dueBadge.tone}`}>{dueBadge.label}</span>}
             {order.orderNo.startsWith('DEMO-') && <span className="badge">체험용</span>}
           </span>
           <span className="truncate text-[15px] font-semibold">{itemSummary(order)}</span>
@@ -179,7 +223,39 @@ function OrderRow({
               <p className="mt-1 text-muted-foreground">
                 입금자명은 주문자 이름({order.buyerName})과 같게 해주세요.
               </p>
+              {order.paymentDueAt && (
+                <p className="mt-1 font-medium">
+                  {formatPaymentDue(order.paymentDueAt)}까지 입금해주세요. 기한이 지나면 주문이 자동으로
+                  취소됩니다.
+                </p>
+              )}
             </div>
+          )}
+
+          {operations && pending && (
+            <section aria-label="입금 기한" className="notice-box flex flex-col gap-3">
+              <p>
+                <span className="font-semibold">입금 기한 </span>
+                {order.paymentDueAt ? `${formatPaymentDue(order.paymentDueAt)}까지` : '없음'}
+                <span className="text-muted-foreground"> · 지나면 자동으로 취소되고 재고가 돌아옵니다.</span>
+              </p>
+              <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => void changeDue(e)}>
+                <label className="field">
+                  새 기한 (그날 23:59까지)
+                  <input
+                    type="date"
+                    className="control"
+                    value={dueDay}
+                    min={seoulDay(new Date())}
+                    max={maxPaymentDueDay(MAX_DUE_DAYS)}
+                    onChange={(e) => setDueDay(e.target.value)}
+                  />
+                </label>
+                <button className="button secondary" disabled={busy || !dueDay}>
+                  기한 변경
+                </button>
+              </form>
+            </section>
           )}
 
           <section aria-label="주문 상품">
@@ -290,6 +366,22 @@ function OrderRow({
                   onChange={(e) => setReason(e.target.value)}
                 />
               </label>
+              {next.includes('FULLY_REFUNDED') && (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={restock}
+                    onChange={(e) => setRestock(e.target.checked)}
+                  />
+                  <span>
+                    전액 환불할 때 주문 수량 {quantity}개를 재고로 되돌리기
+                    <span className="block text-[13px] text-muted-foreground">
+                      돌려받은 물건을 다시 팔 수 있을 때만 선택하세요. 주문 취소는 항상 재고를 되돌립니다.
+                    </span>
+                  </span>
+                </label>
+              )}
               <div className="flex flex-wrap gap-2">
                 {next.map((to) => (
                   <button

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.github.gjaku1031.damdam.common.auth.AdminOnly;
 import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.web.ItemPage;
 import io.github.gjaku1031.damdam.common.web.Paging;
@@ -36,6 +37,7 @@ import lombok.RequiredArgsConstructor;
  * 운영자 블로그 API: 초안·발행·분류·댓글 관리
  */
 @RestController
+@AdminOnly
 @RequestMapping("/admin/posts")
 @RequiredArgsConstructor
 public final class AdminPostController {

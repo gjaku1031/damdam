@@ -3,12 +3,17 @@ package io.github.gjaku1031.damdam.common.web;
 /**
  * 쿼리 문자열의 페이지 값을 관대하게 해석한 쪽 번호·크기
  *
- * 숫자가 아니거나 0이면 기본값, 범위를 벗어나면 쪽 번호는 1 이상, 쪽 크기는 1~100으로 보정
+ * 숫자가 아니거나 0이면 기본값, 범위를 벗어나면 쪽 번호는 1~{@value #MAX_PAGE}, 쪽 크기는 1~100으로 보정
  *
- * @param page 쪽 번호, 1부터 시작
+ * @param page 쪽 번호, 1~{@value #MAX_PAGE}
  * @param size 쪽 크기, 1~{@value #MAX_SIZE}
  */
 public record Paging(int page, int size) {
+    /**
+     * 쪽 번호 상한, 건너뛸 행 수가 정수 범위를 넘지 않게 함
+     */
+    private static final int MAX_PAGE = 1_000_000;
+
     /**
      * 쪽 크기 상한
      */
@@ -25,7 +30,7 @@ public record Paging(int page, int size) {
     public static Paging of(String page, String size, int defaultSize) {
         int parsedPage = parse(page, 1);
         int parsedSize = parse(size, defaultSize);
-        return new Paging(Math.max(1, parsedPage), Math.min(MAX_SIZE, Math.max(1, parsedSize)));
+        return new Paging(Math.min(MAX_PAGE, Math.max(1, parsedPage)), Math.min(MAX_SIZE, Math.max(1, parsedSize)));
     }
 
     /**

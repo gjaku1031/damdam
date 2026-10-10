@@ -20,6 +20,7 @@ import io.github.gjaku1031.damdam.cms.dto.CmsContentResponse;
 import io.github.gjaku1031.damdam.cms.dto.CreateCmsContentRequest;
 import io.github.gjaku1031.damdam.cms.dto.UpdateCmsContentRequest;
 import io.github.gjaku1031.damdam.cms.service.CmsService;
+import io.github.gjaku1031.damdam.common.auth.AdminOnly;
 import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.error.ApiException;
 import io.github.gjaku1031.damdam.common.web.ItemPage;
@@ -33,6 +34,7 @@ import lombok.RequiredArgsConstructor;
  * 경로의 {@code notices}·{@code faqs}로 종류 구분
  */
 @RestController
+@AdminOnly
 @RequestMapping("/admin/cms/{kind:notices|faqs}")
 @RequiredArgsConstructor
 public final class AdminCmsController {

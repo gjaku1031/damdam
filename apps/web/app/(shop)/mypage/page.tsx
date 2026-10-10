@@ -11,6 +11,7 @@ import { LoadError, MemberOnly } from '@/components/operator-only'
 import { EmptyState, ListSkeleton } from '@/components/ui-kit'
 import { AdminHeader, formatDateTime } from '@/components/admin-nav'
 import { confirmAction } from '@/components/confirm-dialog'
+import { formatPaymentDue, paymentDueBadge } from '@/lib/payment-due'
 
 export default function Page() {
   return (
@@ -163,7 +164,11 @@ function Dashboard() {
               icon={<Wallet className="size-4" aria-hidden="true" />}
               label="입금 확인 대기"
               value={`${counts.PENDING_PAYMENT ?? 0}건`}
-              note="통장 내역과 맞춰 확인하세요"
+              note={
+                stats.data.paymentDueTodayCount
+                  ? `오늘 기한 마감 ${stats.data.paymentDueTodayCount}건 · 지나면 자동 취소`
+                  : '통장 내역과 맞춰 확인하세요'
+              }
               tone="warning"
             />
             <StatCard
@@ -230,8 +235,19 @@ function Dashboard() {
                   </p>
                 </div>
                 <div className="hidden min-w-0 sm:block">
-                  <p className="truncate text-sm">입금자 {order.buyerName}</p>
-                  <p className="text-[13px] text-muted-foreground">{formatDateTime(order.createdAt)}</p>
+                  <p className="truncate text-sm">
+                    입금자 {order.buyerName}
+                    {paymentDueBadge(order.paymentDueAt) && (
+                      <span className={`badge ml-2 ${paymentDueBadge(order.paymentDueAt)?.tone}`}>
+                        {paymentDueBadge(order.paymentDueAt)?.label}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[13px] text-muted-foreground">
+                    {order.paymentDueAt
+                      ? `${formatPaymentDue(order.paymentDueAt)}까지`
+                      : formatDateTime(order.createdAt)}
+                  </p>
                 </div>
                 <p className="text-right text-[15px] font-bold">{formatPrice(order.finalPaymentAmount)}</p>
                 <button type="button" className="button sm col-span-2 sm:col-span-1" onClick={() => void confirmPaid(order)}>

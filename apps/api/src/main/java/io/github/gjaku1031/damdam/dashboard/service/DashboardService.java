@@ -52,8 +52,8 @@ public class DashboardService {
      * 대시보드 요약 조회
      *
      * 1. 주문 상태별 건수(없는 상태는 0)
-     * 2. 오늘 생성 주문 수, 오늘·이번 달 순매출(결제 시각 기준, 환불 차감)
-     * 3. 재고 부족 판매 옵션
+     * 2. 오늘 생성 주문 수, 오늘·이번 달 순매출(결제 시각 기준, 환불 차감·결제 후 취소 제외)
+     * 3. 재고 부족 판매 옵션, 오늘 입금 기한이 끝나는 결제 대기 주문 수
      *
      * @return 대시보드 요약
      */
@@ -70,12 +70,18 @@ public class DashboardService {
         Instant todayStart = today.atStartOfDay(SEOUL).toInstant();
         Instant monthStart = today.withDayOfMonth(1).atStartOfDay(SEOUL).toInstant();
         long todayOrders = dsl.fetchCount(ORDERS, ORDERS.CREATEDAT.ge(todayStart));
+        long dueToday = dsl.fetchCount(ORDERS, ORDERS.STATUS.eq(OrderStatus.PENDING_PAYMENT.name()),
+                ORDERS.PAYMENTDUEAT.lt(today.plusDays(1).atStartOfDay(SEOUL).toInstant()));
 
-        return new DashboardResponse(counts, todayOrders, salesSince(todayStart), salesSince(monthStart), lowStock());
+        return new DashboardResponse(counts, todayOrders, salesSince(todayStart), salesSince(monthStart), lowStock(),
+                dueToday);
     }
 
     /**
      * 기준 시각 이후 결제된 주문의 순매출
+     *
+     * 결제 후 취소한 주문은 받은 돈을 돌려주므로 매출에서 제외
+     * 일부 환불은 환불 금액을 기록하지 않으므로({@code refundedAmount} 0) 차감되지 않음
      *
      * @param from 포함하는 시작 시각
      * @return 결제 금액에서 환불 금액을 뺀 합계(원), 없으면 0
@@ -83,7 +89,7 @@ public class DashboardService {
     private long salesSince(Instant from) {
         BigDecimal sum = dsl.select(DSL.sum(ORDERS.FINALPAYMENTAMOUNT.minus(ORDERS.REFUNDEDAMOUNT)))
                 .from(ORDERS)
-                .where(ORDERS.PAIDAT.ge(from))
+                .where(ORDERS.PAIDAT.ge(from), ORDERS.STATUS.ne(OrderStatus.CANCELED.name()))
                 .fetchOne(0, BigDecimal.class);
         return sum == null ? 0 : sum.longValue();
     }
