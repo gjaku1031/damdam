@@ -229,7 +229,7 @@ public class OrderEntity extends BaseEntity {
     }
 
     /**
-     * 시각·금액 기록 없이 상태만 변경(준비 중, 배송 완료, 일부 환불)
+     * 시각·금액 기록 없이 상태만 변경(준비 중, 배송 완료)
      */
     public void moveTo(OrderStatus status) {
         this.status = status;

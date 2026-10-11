@@ -30,11 +30,6 @@ public enum OrderStatus {
     CANCELED,
 
     /**
-     * 일부 환불
-     */
-    PARTIALLY_REFUNDED,
-
-    /**
      * 전액 환불
      */
     FULLY_REFUNDED

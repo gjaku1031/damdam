@@ -9,7 +9,6 @@ export const orderStatus: Record<string, { label: string; tone: string; descript
   PROCESSING: { label: '제작·배송 중', tone: 'badge-violet', description: '상품을 만들거나 보내는 중입니다.' },
   COMPLETED: { label: '배송 완료', tone: 'badge-success', description: '상품을 받으셨습니다.' },
   CANCELED: { label: '주문 취소', tone: '', description: '취소된 주문입니다.' },
-  PARTIALLY_REFUNDED: { label: '부분 환불', tone: 'badge-danger', description: '일부 금액을 환불했습니다.' },
   FULLY_REFUNDED: { label: '환불 완료', tone: 'badge-danger', description: '결제 금액을 모두 환불했습니다.' },
 }
 
@@ -19,7 +18,6 @@ export const orderStatusOrder = [
   'PROCESSING',
   'COMPLETED',
   'CANCELED',
-  'PARTIALLY_REFUNDED',
   'FULLY_REFUNDED',
 ] as const
 
@@ -30,10 +28,9 @@ export function orderStatusLabel(status: string) {
 /** 운영자가 바꿀 수 있는 다음 상태 (API OrderTransitions와 같음) */
 export const orderTransitions: Record<string, string[]> = {
   PENDING_PAYMENT: ['PAID', 'CANCELED'],
-  PAID: ['PROCESSING', 'CANCELED', 'PARTIALLY_REFUNDED', 'FULLY_REFUNDED'],
-  PROCESSING: ['COMPLETED', 'PARTIALLY_REFUNDED', 'FULLY_REFUNDED'],
-  COMPLETED: ['PARTIALLY_REFUNDED', 'FULLY_REFUNDED'],
-  PARTIALLY_REFUNDED: ['FULLY_REFUNDED'],
+  PAID: ['PROCESSING', 'CANCELED', 'FULLY_REFUNDED'],
+  PROCESSING: ['COMPLETED', 'FULLY_REFUNDED'],
+  COMPLETED: ['FULLY_REFUNDED'],
   CANCELED: [],
   FULLY_REFUNDED: [],
 }
@@ -44,6 +41,5 @@ export const orderActionLabels: Record<string, string> = {
   PROCESSING: '제작·발송 시작',
   COMPLETED: '배송 완료 처리',
   CANCELED: '주문 취소',
-  PARTIALLY_REFUNDED: '부분 환불 기록',
   FULLY_REFUNDED: '전액 환불 기록',
 }

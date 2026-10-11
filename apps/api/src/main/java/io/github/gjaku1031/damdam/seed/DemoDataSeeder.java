@@ -40,7 +40,7 @@ import lombok.RequiredArgsConstructor;
  * 체험용 주문 흐름 데이터 생성({@code seed-demo --apply} 명령 전용)
  *
  * 애플리케이션 시작·마이그레이션에서는 실행하지 않음
- * 지정된 기존 목상품 16개에만 사진을 보충하고, 체험 고객 {@code demo}에 상태별 주문 7건을 만듦
+ * 지정된 기존 목상품 16개에만 사진을 보충하고, 체험 고객 {@code demo}에 상태별 주문 6건을 만듦
  * 재실행해도 이미 만든 주문·사진·비밀번호를 바꾸지 않음
  */
 @Service
@@ -70,7 +70,6 @@ public class DemoDataSeeder {
             List.of(OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.PROCESSING),
             List.of(OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.PROCESSING, OrderStatus.COMPLETED),
             List.of(OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELED),
-            List.of(OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.PARTIALLY_REFUNDED),
             List.of(OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.FULLY_REFUNDED));
 
     /**
@@ -82,7 +81,6 @@ public class DemoDataSeeder {
             OrderStatus.PROCESSING, "체험용 상품 준비 및 배송 시작",
             OrderStatus.COMPLETED, "체험용 배송 완료",
             OrderStatus.CANCELED, "체험용 고객 요청 취소 · 재고 복원",
-            OrderStatus.PARTIALLY_REFUNDED, "체험용 일부 금액 환불",
             OrderStatus.FULLY_REFUNDED, "체험용 전액 환불");
 
     /**
@@ -275,9 +273,8 @@ public class DemoDataSeeder {
         int total = variant.getPriceamount() * quantity;
         Instant paidAt = history.contains(OrderStatus.PAID) ? at(createdAt, 1) : null;
         Instant canceledAt = status == OrderStatus.CANCELED ? updatedAt : null;
-        boolean refunded = status == OrderStatus.FULLY_REFUNDED || status == OrderStatus.PARTIALLY_REFUNDED;
-        int refundedAmount = status == OrderStatus.FULLY_REFUNDED ? total
-                : status == OrderStatus.PARTIALLY_REFUNDED ? total / 2 : 0;
+        boolean refunded = status == OrderStatus.FULLY_REFUNDED;
+        int refundedAmount = refunded ? total : 0;
 
         // 무통장 입금 주문 저장
         UUID orderId = UUID.randomUUID();
@@ -375,7 +372,7 @@ public class DemoDataSeeder {
     /**
      * 주문 상태에 대응하는 주문 상품 상태
      *
-     * @return 일부 환불은 결제 완료 유지
+     * @return 결제 완료는 그대로 결제 완료
      */
     private static OrderItemStatus itemStatus(OrderStatus status) {
         return switch (status) {

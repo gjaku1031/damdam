@@ -14,17 +14,14 @@ public final class OrderTransitions {
      */
     private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED = new EnumMap<>(Map.of(
             OrderStatus.PENDING_PAYMENT, Set.of(OrderStatus.PAID, OrderStatus.CANCELED),
-            OrderStatus.PAID, Set.of(OrderStatus.PROCESSING, OrderStatus.CANCELED, OrderStatus.PARTIALLY_REFUNDED,
-                    OrderStatus.FULLY_REFUNDED),
-            OrderStatus.PROCESSING, Set.of(OrderStatus.COMPLETED, OrderStatus.PARTIALLY_REFUNDED,
-                    OrderStatus.FULLY_REFUNDED),
-            OrderStatus.COMPLETED, Set.of(OrderStatus.PARTIALLY_REFUNDED, OrderStatus.FULLY_REFUNDED),
-            OrderStatus.PARTIALLY_REFUNDED, Set.of(OrderStatus.FULLY_REFUNDED),
+            OrderStatus.PAID, Set.of(OrderStatus.PROCESSING, OrderStatus.CANCELED, OrderStatus.FULLY_REFUNDED),
+            OrderStatus.PROCESSING, Set.of(OrderStatus.COMPLETED, OrderStatus.FULLY_REFUNDED),
+            OrderStatus.COMPLETED, Set.of(OrderStatus.FULLY_REFUNDED),
             OrderStatus.CANCELED, Set.of(),
             OrderStatus.FULLY_REFUNDED, Set.of()));
 
     /**
-     * 주문 상태 전이 시 주문 상품에 적용할 상태, 일부 환불 등 상품 상태가 바뀌지 않는 전이는 항목 없음
+     * 주문 상태 전이 시 주문 상품에 적용할 상태, 전이 대상이 아닌 결제 대기는 항목 없음
      */
     private static final Map<OrderStatus, OrderItemStatus> ITEM_STATUS = new EnumMap<>(Map.of(
             OrderStatus.PAID, OrderItemStatus.PAID,
@@ -53,7 +50,7 @@ public final class OrderTransitions {
      * 주문 상태에 대응하는 주문 상품 상태
      *
      * @param status 전이 후 주문 상태
-     * @return 주문 상품 상태, 일부 환불처럼 상품 상태가 바뀌지 않는 전이는 빈 값
+     * @return 주문 상품 상태, 대응하는 상태가 없으면 빈 값
      */
     public static Optional<OrderItemStatus> itemStatus(OrderStatus status) {
         return Optional.ofNullable(ITEM_STATUS.get(status));

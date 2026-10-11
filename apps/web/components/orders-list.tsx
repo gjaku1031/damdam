@@ -22,7 +22,7 @@ export const orderLabels: Record<string, string> = Object.fromEntries(
   Object.entries(orderStatus).map(([key, value]) => [key, value.label]),
 )
 
-const dangerStatuses = new Set(['CANCELED', 'PARTIALLY_REFUNDED', 'FULLY_REFUNDED'])
+const dangerStatuses = new Set(['CANCELED', 'FULLY_REFUNDED'])
 
 /** 운영자가 입금 기한을 늘릴 수 있는 최대 일수 (API PaymentDeadlinePolicy.MAX_DAYS와 같음) */
 const MAX_DUE_DAYS = 30

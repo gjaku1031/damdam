@@ -81,7 +81,6 @@ public class DashboardService {
      * 기준 시각 이후 결제된 주문의 순매출
      *
      * 결제 후 취소한 주문은 받은 돈을 돌려주므로 매출에서 제외
-     * 일부 환불은 환불 금액을 기록하지 않으므로({@code refundedAmount} 0) 차감되지 않음
      *
      * @param from 포함하는 시작 시각
      * @return 결제 금액에서 환불 금액을 뺀 합계(원), 없으면 0
