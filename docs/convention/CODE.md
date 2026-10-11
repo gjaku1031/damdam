@@ -80,6 +80,8 @@ Java API(`apps/api`)의 접근 범위·생성자 주입·JPA 엔티티·jOOQ·nu
 ## 웹 계층과 오류
 
 - 오류는 `ApiException`(상태·메시지·필드)으로 던지고 `GlobalExceptionHandler`가 `{success, statusCode, message, fields?, timestamp}`로 변환.
+- 모든 응답의 기본 캐시 정책은 `no-store`(`NoStoreByDefaultFilter`). CDN은 캐시 지시가 없는 응답을 주소의 확장자만 보고 저장하고 쿠키를 구분하지 않으므로, 오류 응답과 JSON 응답에 이 기본값이 빠지면 안 됨.
+- 캐시를 허용할 응답은 핸들러가 `ResponseEntity.cacheControl`로 명시. 로그인 여부·사용자에 따라 내용이 달라지는 응답에는 허용하지 않음.
 - `POST` 생성·명령 핸들러는 `@ResponseStatus(HttpStatus.CREATED)`. 로그인·로그아웃처럼 200이 계약인 경우만 생략.
 - 로그인 필요 핸들러는 `@LoginRequired`, 운영자 전용은 `@AdminOnly`. `/api/admin/**`은 표시와 관계없이 운영자 검사. 현재 사용자는 `CurrentUser` 매개변수로 받음.
 - 운영 컨트롤러(`/admin/**`)는 클래스에 `@AdminOnly`를 함께 붙임. 경로 검사와 표시 가운데 하나가 빠져도 다른 하나가 막도록 함.

@@ -21,9 +21,10 @@ import tools.jackson.databind.json.JsonMapper;
  * JSON 요청 본문 1MB 제한
  *
  * 사진 업로드(multipart)는 제외, 별도 5MB 제한을 따름
+ * {@link NoStoreByDefaultFilter} 바로 다음에 실행, 여기서 직접 쓰는 413 응답에도 저장 금지가 붙음
  */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 @RequiredArgsConstructor
 public final class RequestBodyLimitFilter extends OncePerRequestFilter {
     /**
