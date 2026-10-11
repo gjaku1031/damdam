@@ -121,7 +121,7 @@ public final class AuthService {
      *
      * @param userId 로그인 사용자 ID
      * @param currentPassword 현재 비밀번호
-     * @param newPassword 새 비밀번호, 12~128자로 검증된 값
+     * @param newPassword 새 비밀번호, 가입 규칙으로 검증된 값
      * @throws ApiException 현재 비밀번호가 틀릴 때(400, {@code fields.currentPassword}), 계정이 삭제됐을 때(401)
      */
     public void changePassword(UUID userId, String currentPassword, String newPassword) {

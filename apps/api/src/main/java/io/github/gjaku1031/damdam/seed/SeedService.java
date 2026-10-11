@@ -12,6 +12,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.github.gjaku1031.damdam.auth.dto.AuthRules;
 import io.github.gjaku1031.damdam.auth.service.PasswordHasher;
 import io.github.gjaku1031.damdam.config.DamdamProperties;
 import io.github.gjaku1031.damdam.system.domain.SystemConfigEntity;
@@ -41,7 +42,12 @@ public class SeedService implements ApplicationRunner {
     /**
      * 초기 운영자 아이디 형식, 가입 규칙과 같음
      */
-    private static final Pattern USERNAME = Pattern.compile("^[a-z0-9_]{4,20}$");
+    private static final Pattern USERNAME = Pattern.compile(AuthRules.USERNAME);
+
+    /**
+     * 초기 운영자 비밀번호 형식, 가입 규칙과 같음
+     */
+    private static final Pattern PASSWORD = Pattern.compile(AuthRules.PASSWORD);
 
     /**
      * 빈 값으로 준비할 설정 키와 설명, 입력 순서 유지
@@ -116,7 +122,7 @@ public class SeedService implements ApplicationRunner {
      * 3. 아이디·비밀번호 형식 검사 후 해시 생성
      * 4. 기존 운영자가 있으면 자격 증명 교체, 없으면 새 운영자 저장
      *
-     * @throws IllegalStateException 아이디 형식이 틀리거나 비밀번호가 12~128자가 아닐 때
+     * @throws IllegalStateException 아이디·비밀번호가 가입 규칙에 맞지 않을 때
      */
     private void bootstrapAdministrator() {
         // 비밀번호를 설정하지 않은 환경은 운영자 준비 생략
@@ -128,7 +134,7 @@ public class SeedService implements ApplicationRunner {
         Optional<UserEntity> existing = users.findFirstByRoleAndDeletedAtIsNull(UserRole.ADMIN);
         if (existing.isPresent() && passwords.isCurrentFormat(existing.get().getPasswordHash())) return;
         // 형식 검사 후 계정 생성·갱신
-        if (!USERNAME.matcher(username).matches() || password.length() < 12 || password.length() > 128) {
+        if (!USERNAME.matcher(username).matches() || !PASSWORD.matcher(password).matches()) {
             throw new IllegalStateException("Invalid bootstrap administrator credentials.");
         }
         String hash = passwords.hash(password);

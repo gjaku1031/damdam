@@ -16,11 +16,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import io.github.gjaku1031.damdam.auth.dto.AuthRules;
 import io.github.gjaku1031.damdam.auth.service.PasswordHasher;
 import io.github.gjaku1031.damdam.jooq.tables.records.ProductImagesRecord;
 import io.github.gjaku1031.damdam.jooq.tables.records.ProductVariantsRecord;
@@ -89,6 +91,11 @@ public class DemoDataSeeder {
     private static final int PHOTOS_PER_PRODUCT = 3;
 
     /**
+     * 체험 고객 비밀번호 형식, 가입 규칙과 같음
+     */
+    private static final Pattern PASSWORD = Pattern.compile(AuthRules.PASSWORD);
+
+    /**
      * 체험 데이터 jOOQ 접근
      */
     private final DSLContext dsl;
@@ -113,14 +120,15 @@ public class DemoDataSeeder {
      * 3. 체험 고객 확인 또는 생성(다른 사람의 {@code demo} 계정이면 중단)
      * 4. 판매 중 옵션을 잠근 뒤 없는 체험 주문만 생성, 재고·재고 이력 반영
      *
-     * @param password 체험 고객 비밀번호, 12~128자(기존 계정이면 사용하지 않음)
+     * @param password 체험 고객 비밀번호, 가입 규칙과 같은 형식(기존 계정이면 사용하지 않음)
      * @return 고객 아이디, 대상 상품 수, 추가한 사진 수, 생성한 주문 수
-     * @throws IllegalArgumentException 비밀번호 길이가 잘못됐을 때
+     * @throws IllegalArgumentException 비밀번호가 가입 규칙에 맞지 않을 때
      * @throws IllegalStateException 목상품이 없거나 사진·계정·재고 조건이 맞지 않을 때
      */
     public Map<String, Object> seed(String password) {
-        if (password == null || password.length() < 12 || password.length() > 128) {
-            throw new IllegalArgumentException("Set DEMO_CUSTOMER_PASSWORD to 12–128 characters.");
+        if (password == null || !PASSWORD.matcher(password).matches()) {
+            throw new IllegalArgumentException(
+                    "Set DEMO_CUSTOMER_PASSWORD to 8–128 characters with a letter and a digit.");
         }
         String passwordHash = passwords.hash(password);
         return transaction.execute(status -> seedInTransaction(passwordHash));

@@ -10,7 +10,7 @@ cd damdam
 cp .env.example .env
 ```
 
-`.env`의 `POSTGRES_PASSWORD`를 채웁니다. 로그인 세션은 Spring Session이 PostgreSQL에 저장하며 별도 세션 비밀키는 필요하지 않습니다. 운영자 아이디는 `SEED_ADMIN_USERNAME=admin`, 초기 비밀번호는 12~128자의 `SEED_ADMIN_PASSWORD`로 주입합니다. 운영자·약관·기본 운영 설정만 준비합니다.
+`.env`의 `POSTGRES_PASSWORD`를 채웁니다. 로그인 세션은 Spring Session이 PostgreSQL에 저장하며 별도 세션 비밀키는 필요하지 않습니다. 운영자 아이디는 `SEED_ADMIN_USERNAME=admin`, 초기 비밀번호는 영문·숫자를 포함한 8~128자의 `SEED_ADMIN_PASSWORD`로 주입합니다. 운영자·약관·기본 운영 설정만 준비합니다.
 
 ```bash
 docker compose up -d --build --wait
@@ -39,7 +39,7 @@ docker compose up -d postgres
 pnpm dev
 ```
 
-웹은 3000, API는 4000 포트를 사용합니다. `/signup`에서 아이디·비밀번호·비밀번호 확인과 필수 약관 동의로 가입하고 자동 로그인합니다. 아이디는 대소문자를 구분하지 않는 영문·숫자·밑줄 4~20자이며 비밀번호는 12~128자입니다.
+웹은 3000, API는 4000 포트를 사용합니다. `/signup`에서 아이디·비밀번호·비밀번호 확인과 필수 약관 동의로 가입하고 자동 로그인합니다. 아이디는 대소문자를 구분하지 않는 영문·숫자·밑줄 4~20자이며 비밀번호는 영문과 숫자를 포함한 8자 이상(최대 128자)입니다.
 
 ## 검증
 

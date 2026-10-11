@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { MemberOnly } from '@/components/operator-only'
 import { PageHeader } from '@/components/ui-kit'
-import { PasswordInput } from '@/components/password-input'
+import { isValidPassword, PASSWORD_MESSAGE, PasswordChecklist, PasswordInput } from '@/components/password-input'
 import { confirmAction } from '@/components/confirm-dialog'
 import { ApiError, changePassword, withdrawAccount } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
@@ -45,7 +45,7 @@ function PasswordCard() {
     e.preventDefault()
     const issues: Record<string, string> = {}
     if (!current) issues.currentPassword = '현재 비밀번호를 입력해주세요.'
-    if (next.length < 12 || next.length > 128) issues.newPassword = '새 비밀번호는 12~128자로 입력해주세요.'
+    if (!isValidPassword(next)) issues.newPassword = PASSWORD_MESSAGE
     else if (next === current) issues.newPassword = '현재 비밀번호와 다른 비밀번호를 입력해주세요.'
     if (next !== confirm) issues.confirm = '새 비밀번호가 일치하지 않습니다.'
     setErrors(issues)
@@ -72,7 +72,7 @@ function PasswordCard() {
     value: string,
     set: (v: string) => void,
     autoComplete: string,
-    hint?: string,
+    checklist = false,
   ) => (
     <label className="field">
       {label}
@@ -83,13 +83,9 @@ function PasswordCard() {
         maxLength={128}
         disabled={busy}
         aria-invalid={Boolean(errors[id])}
-        aria-describedby={[hint && 'hint-' + id, errors[id] && 'error-' + id].filter(Boolean).join(' ') || undefined}
+        aria-describedby={[checklist && 'hint-' + id, errors[id] && 'error-' + id].filter(Boolean).join(' ') || undefined}
       />
-      {hint && (
-        <span id={'hint-' + id} className="field-hint">
-          {hint}
-        </span>
-      )}
+      {checklist && <PasswordChecklist id={'hint-' + id} value={value} />}
       {errors[id] && (
         <span id={'error-' + id} className="field-error mt-0">
           {errors[id]}
@@ -105,7 +101,7 @@ function PasswordCard() {
           비밀번호 변경
         </h2>
         {field('currentPassword', '현재 비밀번호', current, setCurrent, 'current-password')}
-        {field('newPassword', '새 비밀번호', next, setNext, 'new-password', '12~128자로 입력해주세요.')}
+        {field('newPassword', '새 비밀번호', next, setNext, 'new-password', true)}
         {field('confirm', '새 비밀번호 확인', confirm, setConfirm, 'new-password')}
         {errors.form && (
           <p role="alert" className="field-error">

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { ApiError, registerAccount } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 import { Logo } from './ui-kit'
-import { PasswordInput } from './password-input'
+import { isValidPassword, PASSWORD_MESSAGE, PasswordChecklist, PasswordInput } from './password-input'
 
 export function AuthForm({ signup = false }: { signup?: boolean }) {
   const router = useRouter(),
@@ -34,8 +34,7 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
     if (!/^[a-z0-9_]{4,20}$/i.test(username.trim()))
       issues.username = '영문·숫자·밑줄로 4~20자 아이디를 입력해주세요.'
     if (!signup && !password) issues.password = '비밀번호를 입력해주세요.'
-    if (signup && (password.length < 12 || password.length > 128))
-      issues.password = '비밀번호는 12~128자로 입력해주세요.'
+    if (signup && !isValidPassword(password)) issues.password = PASSWORD_MESSAGE
     if (signup && password !== confirm) issues.confirm = '비밀번호가 일치하지 않습니다.'
     if (signup && (!service || !privacy)) issues.terms = '필수 약관에 동의해주세요.'
     setErrors(issues)
@@ -143,11 +142,7 @@ export function AuthForm({ signup = false }: { signup?: boolean }) {
                 aria-invalid={Boolean(errors.password)}
                 aria-describedby={describe('password', signup)}
               />
-              {signup && (
-                <span id="hint-password" className="field-hint">
-                  12~128자
-                </span>
-              )}
+              {signup && <PasswordChecklist id="hint-password" value={password} />}
               {error('password')}
             </label>
             {signup && (
