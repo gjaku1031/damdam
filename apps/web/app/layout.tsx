@@ -25,20 +25,8 @@ export const metadata: Metadata = {
     images: [{ url: '/brand/hero-workshop.jpg', width: 1200, height: 630, alt: '담담공방 작업실' }],
   },
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
+    // 16·32·48px을 크기별로 다듬어 담은 파일, 탭에서 선이 뭉개지지 않게 SVG 대신 이것만 연결
+    icon: [{ url: '/favicon.ico', sizes: '16x16 32x32 48x48' }],
     apple: '/apple-icon.png',
   },
 }
