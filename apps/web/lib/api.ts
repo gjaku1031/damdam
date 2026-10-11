@@ -266,6 +266,8 @@ export interface ApiOrderItem {
   unitPriceAmount: number
   quantity: number
   status: string
+  /** 지금의 옵션. 운영자 주문 상세에만 있고, 옵션이 지워졌으면 없음 */
+  variant?: { id: string } | null
 }
 export interface ApiOrder {
   id: string
@@ -368,6 +370,12 @@ export const updateAdminOrderStatus = (
   id: string,
   data: { status: string; reason?: string; restock?: boolean },
 ) => mutate<ApiOrder>('/admin/orders/' + id + '/status', 'PATCH', data)
+/** 운영자가 원 주문의 손님 앞으로 새 주문 생성. 주문자·배송지는 원 주문 것을 서버가 그대로 씀 */
+export const createProxyOrder = (data: {
+  sourceOrderId: string
+  items: { variantId: string; quantity: number }[]
+  paid: boolean
+}) => mutate<ApiOrder>('/admin/orders', 'POST', data)
 export const changeAdminOrderPaymentDue = (id: string, dueAt: string) =>
   mutate<ApiOrder>('/admin/orders/' + id + '/payment-due', 'PATCH', { dueAt })
 export const fetchAuditLogs = (params?: { page?: number; size?: number; target?: string }) =>

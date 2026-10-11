@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * 성공한 운영 변경 요청({@code /api/admin/**}, GET 제외)의 운영 기록 저장
  *
- * 상품·게시글·주문 입금 기한 변경은 서비스에서 더 구체적인 기록을 남기므로 제외(게시글 분류는 포함)
+ * 상품·게시글·대리 주문 생성·주문 입금 기한 변경은 서비스에서 더 구체적인 기록을 남기므로 제외(게시글 분류는 포함)
  */
 @RestControllerAdvice
 @RequiredArgsConstructor
@@ -82,11 +82,11 @@ public final class OperationsAuditAdvice implements ResponseBodyAdvice<Object> {
         String method = request.getMethod();
         if (user == null || !RequestPaths.isAdmin(segments) || "GET".equals(method)) return body;
 
-        // 서비스가 직접 기록하는 상품·게시글·주문 입금 기한 경로 제외
+        // 서비스가 직접 기록하는 상품·게시글·대리 주문 생성·주문 입금 기한 경로 제외
         String path = segments.stream().skip(2).map(segment -> segment.toLowerCase(Locale.ROOT))
                 .collect(Collectors.joining("/"));
         if (path.matches("^products(/.*)?$") || path.matches("^posts(/.*)?$") && !path.matches("^posts/categories(/.*)?$")
-                || path.matches("^orders/[^/]+/payment-due$")) {
+                || path.equals("orders") || path.matches("^orders/[^/]+/payment-due$")) {
             return body;
         }
 

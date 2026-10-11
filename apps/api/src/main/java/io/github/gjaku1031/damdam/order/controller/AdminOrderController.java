@@ -8,9 +8,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.github.gjaku1031.damdam.common.auth.AdminOnly;
@@ -19,6 +21,7 @@ import io.github.gjaku1031.damdam.common.error.ApiException;
 import io.github.gjaku1031.damdam.common.web.Paging;
 import io.github.gjaku1031.damdam.order.domain.OrderStatus;
 import io.github.gjaku1031.damdam.order.dto.ChangePaymentDueRequest;
+import io.github.gjaku1031.damdam.order.dto.CreateProxyOrderRequest;
 import io.github.gjaku1031.damdam.order.dto.OrderPage;
 import io.github.gjaku1031.damdam.order.dto.OrderResponse;
 import io.github.gjaku1031.damdam.order.dto.UpdateOrderStatusRequest;
@@ -27,7 +30,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 운영자 주문 조회·상태 변경·입금 기한 변경 API
+ * 운영자 주문 조회·대리 주문·상태 변경·입금 기한 변경 API
  */
 @RestController
 @AdminOnly
@@ -63,6 +66,20 @@ public final class AdminOrderController {
     @GetMapping("/{id}")
     public OrderResponse detail(@PathVariable UUID id) {
         return orders.detail(id);
+    }
+
+    /**
+     * 고객 대신 주문 생성
+     *
+     * 주문자·배송지는 원 주문에서 가져오고, 상품 가격·재고 규칙은 고객 주문과 같음
+     * 운영 기록은 서비스가 주문번호·회원·원 주문과 함께 남김
+     *
+     * @return 생성한 주문
+     */
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public OrderResponse create(@Valid @RequestBody CreateProxyOrderRequest body, CurrentUser user) {
+        return orders.createForCustomer(user.id(), body);
     }
 
     /**

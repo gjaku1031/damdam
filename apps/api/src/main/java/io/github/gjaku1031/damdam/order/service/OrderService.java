@@ -34,12 +34,15 @@ import io.github.gjaku1031.damdam.common.web.Paging;
 import io.github.gjaku1031.damdam.inventory.domain.InventoryAdjustmentEntity;
 import io.github.gjaku1031.damdam.inventory.repository.InventoryAdjustmentRepository;
 import io.github.gjaku1031.damdam.order.domain.ChangeActorType;
+import io.github.gjaku1031.damdam.order.domain.OrderContact;
 import io.github.gjaku1031.damdam.order.domain.OrderEntity;
 import io.github.gjaku1031.damdam.order.domain.OrderItemEntity;
+import io.github.gjaku1031.damdam.order.domain.OrderPaymentMethod;
 import io.github.gjaku1031.damdam.order.domain.OrderStatus;
 import io.github.gjaku1031.damdam.order.domain.OrderStatusHistoryEntity;
 import io.github.gjaku1031.damdam.order.domain.OrderTransitions;
 import io.github.gjaku1031.damdam.order.dto.CreateOrderRequest;
+import io.github.gjaku1031.damdam.order.dto.CreateProxyOrderRequest;
 import io.github.gjaku1031.damdam.order.dto.OrderItemResponse;
 import io.github.gjaku1031.damdam.order.dto.OrderPage;
 import io.github.gjaku1031.damdam.order.dto.OrderResponse;
@@ -149,12 +152,7 @@ public class OrderService {
     private final DSLContext dsl;
 
     /**
-     * 주문 생성
-     *
-     * 1. 옵션 중복 확인
-     * 2. 옵션 행을 ID 순서로 잠금(동시 주문 직렬화, 교착 방지)
-     * 3. 판매 여부·재고 확인 후 서버 가격으로 합계 계산
-     * 4. 입금 기한을 계산해 주문·주문 상품 스냅샷 저장, 재고 차감과 재고 이력, 생성 이력 기록
+     * 고객 주문 생성
      *
      * @param userId 주문자 ID
      * @return 주문 상품·상태 이력을 포함한 결제 대기 주문
@@ -162,7 +160,67 @@ public class OrderService {
      */
     @Transactional
     public OrderResponse create(UUID userId, CreateOrderRequest request) {
-        List<UUID> variantIds = request.items().stream().map(CreateOrderRequest.Item::variantId).toList();
+        Placed placed = place(userId, request.items(), request.paymentMethodOrDefault(), request.contact(),
+                ChangeActorType.CUSTOMER, userId, "주문 생성");
+        return OrderResponse.of(placed.order(), placed.items().stream().map(OrderItemResponse::from).toList(),
+                List.of(OrderStatusHistoryResponse.from(placed.history())), null);
+    }
+
+    /**
+     * 운영자 대리 주문 생성
+     *
+     * 일부 반품·교환처럼 원 주문을 전액 환불로 닫은 뒤 남길 상품만 다시 주문으로 받을 때 사용
+     * 주문·재고·이력·입금 확인이 하나의 트랜잭션에서 처리되고 실패 시 함께 롤백됨
+     *
+     * 1. 원 주문과 그 주문자(탈퇴하지 않은 회원) 확인
+     * 2. 원 주문의 연락처·배송지로 고객 주문과 같은 규칙의 주문 생성, 재고 차감
+     * 3. 이미 받은 돈으로 처리하면 바로 입금 확인으로 전이
+     * 4. 운영 기록 저장
+     *
+     * 새 주문 행은 커밋 전까지 이 트랜잭션에서만 보이므로 옵션을 먼저 잠가도 주문 → 옵션 잠금 순서와 충돌하지 않음
+     *
+     * @param actorUserId 주문을 만든 운영자 ID, 재고 이력의 작업자
+     * @return 주문 상품·상태 이력·주문자를 포함한 주문
+     * @throws ApiException 원 주문 없음(404), 주문자가 탈퇴했거나 없음(409), 옵션 중복·판매하지 않는 옵션·재고 부족(400)
+     */
+    @Transactional
+    public OrderResponse createForCustomer(UUID actorUserId, CreateProxyOrderRequest request) {
+        OrderEntity source = orders.findById(request.sourceOrderId()).orElseThrow(OrderService::orderNotFound);
+        UserEntity customer = source.getUserId() == null ? null
+                : users.findByIdAndDeletedAtIsNull(source.getUserId()).orElse(null);
+        if (customer == null) throw ApiException.conflict("탈퇴한 회원 앞으로는 주문을 만들 수 없습니다.");
+
+        // 원 주문의 결제 수단·연락처로 새 주문 생성
+        Placed placed = place(customer.getId(), request.items(), source.getPaymentMethod(), source.contact(),
+                ChangeActorType.ADMIN, actorUserId, "운영자 대리 주문 · 원 주문 " + source.getOrderNo());
+        OrderEntity order = placed.order();
+        if (request.paidRequested()) {
+            transition(order, OrderStatus.PAID, ChangeActorType.ADMIN, "원 주문 결제 금액으로 처리", actorUserId, false);
+        }
+        system.log(actorUserId, AdminAuditAction.CREATE, AUDIT_TARGET, order.getId().toString(),
+                "주문 %s 대리 생성 · 회원 %s · 원 주문 %s · %s".formatted(order.getOrderNo(), customer.getUsername(),
+                        source.getOrderNo(), request.paidRequested() ? "입금 확인" : "결제 대기"));
+        return detail(order);
+    }
+
+    /**
+     * 결제 대기 주문 저장과 재고 차감
+     *
+     * 1. 옵션 중복 확인
+     * 2. 옵션 행을 ID 순서로 잠금(동시 주문 직렬화, 교착 방지)
+     * 3. 판매 여부·재고 확인 후 서버 가격으로 합계 계산
+     * 4. 입금 기한을 계산해 주문·주문 상품 스냅샷 저장, 재고 차감과 재고 이력, 생성 이력 기록
+     *
+     * @param userId 주문자 ID
+     * @param actor 생성 이력의 주체
+     * @param actorUserId 재고 이력의 작업자(고객 본인 또는 운영자)
+     * @param reason 생성 이력 사유
+     * @return 저장한 주문·주문 상품·생성 이력
+     * @throws ApiException 옵션 중복·판매하지 않는 옵션·재고 부족(400)
+     */
+    private Placed place(UUID userId, List<CreateOrderRequest.Item> lines, OrderPaymentMethod paymentMethod,
+            OrderContact contact, ChangeActorType actor, UUID actorUserId, String reason) {
+        List<UUID> variantIds = lines.stream().map(CreateOrderRequest.Item::variantId).toList();
         if (new HashSet<>(variantIds).size() != variantIds.size()) {
             throw ApiException.badRequest("동일 옵션은 한 번만 주문해주세요.");
         }
@@ -174,7 +232,7 @@ public class OrderService {
                         .map(ProductVariantEntity::getProductId).distinct().toList()).stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
         int total = 0;
-        for (CreateOrderRequest.Item line : request.items()) {
+        for (CreateOrderRequest.Item line : lines) {
             ProductVariantEntity variant = variantById.get(line.variantId());
             ProductEntity product = variant == null ? null : productById.get(variant.getProductId());
             if (variant == null || !variant.isActive() || product == null || !product.isVisible() || product.isDeleted()) {
@@ -187,23 +245,22 @@ public class OrderService {
         }
 
         // 주문·주문 상품 저장과 재고 차감
-        OrderEntity order = orders.save(OrderEntity.place(newOrderNo(), userId, request.paymentMethodOrDefault(), total,
-                request.contact(), PaymentDeadlinePolicy.dueAt(Instant.now(), system.paymentDueDays())));
+        OrderEntity order = orders.save(OrderEntity.place(newOrderNo(), userId, paymentMethod, total, contact,
+                PaymentDeadlinePolicy.dueAt(Instant.now(), system.paymentDueDays())));
         Map<UUID, String> thumbnails = thumbnails(productById.keySet());
         List<OrderItemEntity> created = new ArrayList<>();
-        for (CreateOrderRequest.Item line : request.items()) {
+        for (CreateOrderRequest.Item line : lines) {
             ProductVariantEntity variant = variantById.get(line.variantId());
             ProductEntity product = productById.get(variant.getProductId());
             created.add(items.save(OrderItemEntity.snapshot(order.getId(), variant.getId(), product.getName(),
                     variant.getName(), thumbnails.get(product.getId()), variant.getPriceAmount(), line.quantity())));
             variant.adjustStock(-line.quantity());
-            adjustments.save(InventoryAdjustmentEntity.of(variant.getId(), userId, -line.quantity(),
+            adjustments.save(InventoryAdjustmentEntity.of(variant.getId(), actorUserId, -line.quantity(),
                     "주문 " + order.getOrderNo()));
         }
         OrderStatusHistoryEntity history = histories.save(OrderStatusHistoryEntity.of(order.getId(), null,
-                OrderStatus.PENDING_PAYMENT, ChangeActorType.CUSTOMER, "주문 생성"));
-        return OrderResponse.of(order, created.stream().map(OrderItemResponse::from).toList(),
-                List.of(OrderStatusHistoryResponse.from(history)), null);
+                OrderStatus.PENDING_PAYMENT, actor, reason));
+        return new Placed(order, created, history);
     }
 
     /**
@@ -521,4 +578,13 @@ public class OrderService {
     private static ApiException orderNotFound() {
         return ApiException.notFound("주문을 찾을 수 없습니다.");
     }
+
+    /**
+     * 방금 저장한 주문
+     *
+     * @param order 결제 대기 주문
+     * @param items 주문 상품, 요청 순서
+     * @param history 생성 이력
+     */
+    private record Placed(OrderEntity order, List<OrderItemEntity> items, OrderStatusHistoryEntity history) {}
 }

@@ -14,6 +14,7 @@ import {
   seoulDay,
 } from '@/lib/payment-due'
 import { confirmAction } from './confirm-dialog'
+import { ProxyOrderForm } from './proxy-order-form'
 import { StatusBadge } from './ui-kit'
 import { formatDateTime } from './admin-nav'
 
@@ -69,7 +70,8 @@ function OrderRow({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [restock, setRestock] = useState(false),
-    [dueDay, setDueDay] = useState('')
+    [dueDay, setDueDay] = useState(''),
+    [proxy, setProxy] = useState(false)
   const detail = useApi<ApiOrder>(
     open ? (operations ? '/admin/orders/' : '/orders/') + order.id : null,
   )
@@ -403,6 +405,30 @@ function OrderRow({
               </div>
             </section>
           )}
+
+          {operations &&
+            order.user &&
+            (proxy && detail.data ? (
+              <ProxyOrderForm
+                source={detail.data}
+                onClose={() => setProxy(false)}
+                onCreated={() => {
+                  setProxy(false)
+                  onChanged()
+                }}
+              />
+            ) : (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={busy || !detail.data}
+                  onClick={() => setProxy(true)}
+                >
+                  이 손님 앞으로 새 주문
+                </button>
+              </div>
+            ))}
 
           {pendingCustomer && (
             <div className="flex justify-end">

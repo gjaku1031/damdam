@@ -175,6 +175,16 @@ public class OrderEntity extends BaseEntity {
     }
 
     /**
+     * 주문자 연락처와 배송지
+     *
+     * @return 이 주문에 저장된 값의 사본, 같은 고객 앞으로 새 주문을 만들 때 사용
+     */
+    public OrderContact contact() {
+        return new OrderContact(buyerName, buyerPhone, shipName, shipPhone, shipPostalCode, shipAddress1, shipAddress2,
+                shipMemo);
+    }
+
+    /**
      * 주문자 여부
      *
      * @return 주문자 ID가 같으면 {@code true}
