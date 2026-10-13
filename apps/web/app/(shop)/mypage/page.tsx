@@ -154,6 +154,30 @@ function Dashboard() {
     <div className="page">
       <AdminHeader title="오늘 할 일" description="입금 확인과 발송 준비가 필요한 주문부터 처리하세요." />
       {stats.error && <LoadError message={stats.error} onRetry={stats.reload} />}
+      {/* 정상이면 항상 비어 있는 목록. 재고가 변동 기록 없이 바뀐 옵션이 생겼을 때만 표시 */}
+      {stats.data && stats.data.stockLedgerMismatches.length > 0 && (
+        <section role="alert" className="card mb-6 border-destructive/40 p-5" aria-labelledby="ledger-title">
+          <h2 id="ledger-title" className="flex items-center gap-2 text-[15px] font-bold">
+            <AlertTriangle className="size-4 shrink-0 text-destructive" aria-hidden="true" />
+            재고 기록이 맞지 않는 옵션 {stats.data.stockLedgerMismatches.length}개
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            현재 재고가 재고 변동 기록의 합계와 다릅니다. 기록 없이 재고가 바뀐 것이므로 원인을 확인해야 합니다.
+          </p>
+          <ul className="mt-3 text-sm">
+            {stats.data.stockLedgerMismatches.map((item) => (
+              <li key={item.variantId} className="flex flex-wrap justify-between gap-x-3 border-t border-border py-2">
+                <Link href={'/products/' + item.productId} className="min-w-0 truncate hover:underline">
+                  {item.productName} · {item.variantName}
+                </Link>
+                <span className="shrink-0 font-semibold">
+                  현재 {item.stock}개 · 기록 합계 {item.ledgerTotal}개
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stats.loading || !stats.data ? (
           Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton h-[132px]" aria-hidden="true" />)

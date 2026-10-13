@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import io.github.gjaku1031.damdam.dashboard.dto.DashboardResponse;
 import io.github.gjaku1031.damdam.dashboard.dto.LowStockItem;
+import io.github.gjaku1031.damdam.inventory.service.InventoryService;
 import io.github.gjaku1031.damdam.order.domain.OrderStatus;
 import lombok.RequiredArgsConstructor;
 
@@ -49,11 +50,17 @@ public class DashboardService {
     private final DSLContext dsl;
 
     /**
+     * 재고·이력 대조
+     */
+    private final InventoryService inventory;
+
+    /**
      * 대시보드 요약 조회
      *
      * 1. 주문 상태별 건수(없는 상태는 0)
      * 2. 오늘 생성 주문 수, 오늘·이번 달 순매출(결제 시각 기준, 환불 차감·결제 후 취소 제외)
      * 3. 재고 부족 판매 옵션, 오늘 입금 기한이 끝나는 결제 대기 주문 수
+     * 4. 현재 재고와 재고 이력 합계가 다른 옵션
      *
      * @return 대시보드 요약
      */
@@ -74,7 +81,7 @@ public class DashboardService {
                 ORDERS.PAYMENTDUEAT.lt(today.plusDays(1).atStartOfDay(SEOUL).toInstant()));
 
         return new DashboardResponse(counts, todayOrders, salesSince(todayStart), salesSince(monthStart), lowStock(),
-                dueToday);
+                dueToday, inventory.ledgerMismatches());
     }
 
     /**

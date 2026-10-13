@@ -8,12 +8,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import io.github.gjaku1031.damdam.inventory.dto.StockLedgerMismatch;
+import io.github.gjaku1031.damdam.inventory.service.InventoryService;
 import io.github.gjaku1031.damdam.order.service.OrderService;
 import io.github.gjaku1031.damdam.storage.service.StorageService;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 시간이 지나면 정리해야 하는 데이터(입금 기한이 지난 주문, 업로드 티켓)의 주기적 처리
+ * 시간이 지나면 정리해야 하는 데이터(입금 기한이 지난 주문, 업로드 티켓)의 주기적 처리와 재고·이력 대조 점검
  *
  * 트랜잭션은 각 대상 서비스에서 처리
  */
@@ -39,6 +41,11 @@ public final class SchedulerService {
      * 사진 저장 서비스
      */
     private final StorageService storage;
+
+    /**
+     * 재고·이력 대조
+     */
+    private final InventoryService inventory;
 
     /**
      * 입금 기한이 지난 결제 대기 주문 자동 취소, 5분마다 실행
@@ -71,5 +78,19 @@ public final class SchedulerService {
     public void failExpiredTickets() {
         int count = storage.failExpiredTickets();
         if (count > 0) log.info("{}건의 만료된 업로드 티켓을 정리했습니다", count);
+    }
+
+    /**
+     * 현재 재고와 재고 이력 합계 대조, 매시 30분 실행
+     *
+     * 어긋난 옵션은 고치지 않고 오류 로그로만 알림, 원인(이력 없이 재고를 바꾼 경로)을 찾는 것이 먼저이기 때문임
+     * 같은 내용을 운영자 대시보드에도 표시하므로, 이 로그는 화면을 열지 않아도 남는 기록 역할
+     */
+    @Scheduled(cron = "0 30 * * * *")
+    public void checkStockLedger() {
+        for (StockLedgerMismatch mismatch : inventory.ledgerMismatches()) {
+            log.error("재고와 재고 이력이 맞지 않습니다: {} · {} (옵션 {}) 현재 재고 {}, 이력 합계 {}", mismatch.productName(),
+                    mismatch.variantName(), mismatch.variantId(), mismatch.stock(), mismatch.ledgerTotal());
+        }
     }
 }

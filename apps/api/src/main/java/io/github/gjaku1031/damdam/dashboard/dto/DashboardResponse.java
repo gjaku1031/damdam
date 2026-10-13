@@ -3,6 +3,7 @@ package io.github.gjaku1031.damdam.dashboard.dto;
 import java.util.List;
 import java.util.Map;
 
+import io.github.gjaku1031.damdam.inventory.dto.StockLedgerMismatch;
 import io.github.gjaku1031.damdam.order.domain.OrderStatus;
 
 /**
@@ -16,6 +17,8 @@ import io.github.gjaku1031.damdam.order.domain.OrderStatus;
  * @param monthSalesAmount 이번 달 결제 완료된 주문의 결제 금액에서 전액 환불 금액을 뺀 합계(원), 기준은 오늘 매출과 같음
  * @param lowStock 재고 3개 이하 판매 옵션, 재고 적은 순·상품명 순 최대 10개
  * @param paymentDueTodayCount 입금 기한이 오늘 안에 끝나는 결제 대기 주문 수(이미 지났지만 아직 취소 전인 주문 포함)
+ * @param stockLedgerMismatches 현재 재고와 재고 이력 합계가 다른 옵션, 정상이면 빈 목록
  */
 public record DashboardResponse(Map<OrderStatus, Long> orderCounts, long todayOrderCount, long todaySalesAmount,
-        long monthSalesAmount, List<LowStockItem> lowStock, long paymentDueTodayCount) {}
+        long monthSalesAmount, List<LowStockItem> lowStock, long paymentDueTodayCount,
+        List<StockLedgerMismatch> stockLedgerMismatches) {}

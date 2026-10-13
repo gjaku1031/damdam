@@ -27,7 +27,7 @@ public final class AdminDashboardController {
     /**
      * 대시보드 요약 조회
      *
-     * @return 주문 상태별 건수·오늘 주문·매출·재고 부족 옵션
+     * @return 주문 상태별 건수·오늘 주문·매출·재고 부족 옵션·재고와 이력이 어긋난 옵션
      */
     @GetMapping
     public DashboardResponse summary() {

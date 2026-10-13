@@ -363,6 +363,15 @@ export interface AdminDashboard {
   }[]
   /** 입금 기한이 오늘 안에 끝나는 결제 대기 주문 수 */
   paymentDueTodayCount: number
+  /** 현재 재고와 재고 변동 기록의 합계가 다른 옵션. 정상이면 빈 배열 */
+  stockLedgerMismatches: {
+    productId: string
+    productName: string
+    variantId: string
+    variantName: string
+    stock: number
+    ledgerTotal: number
+  }[]
 }
 export const fetchAdminDashboard = () => fetchApi<AdminDashboard>('/admin/dashboard')
 export const fetchAdminOrder = (id: string) => fetchApi<ApiOrder>('/admin/orders/' + id)
