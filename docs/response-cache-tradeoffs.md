@@ -173,7 +173,7 @@ GET /api/products;probe1.jpg   → 200 application/json  cf-cache-status: HIT   
 
 ## 남는 위험
 
-- 이미 CDN에 저장된 응답은 기간이 끝날 때까지 남음. 확인하면서 만든 `/api/products;probe1.jpg`, `;probe2.jpg`가 그렇고(배포 뒤에도 `HIT`), 내용은 공개 상품 목록임. 바로 지우려면 CDN에서 캐시 삭제를 실행해야 함.
-- 방어선이 원 서버 한 겹임. CDN의 Cache Deception Armor를 켜고 `/api/*` 가운데 사진 주소만 캐시 대상으로 두는 규칙을 더하면 두 겹이 됨.
+- 이미 CDN에 저장된 응답은 기간이 끝날 때까지 남음. 확인하면서 만든 `/api/products;probe1.jpg`, `;probe2.jpg`가 그랬고(배포 직후에도 `HIT`), 내용은 공개 상품 목록이었음. 2026-10-13에 다시 요청하니 `no-store`, `BYPASS`로 기간이 끝나 사라져 있었음. 기다리지 않고 지우려면 CDN에서 캐시 삭제를 실행해야 함.
+- 방어선이 원 서버 한 겹임. CDN의 Cache Deception Armor를 켜고 `/api/*` 가운데 사진 주소만 캐시 대상으로 두는 규칙을 더하면 두 겹이 됨. Cloudflare를 다른 계정으로 옮길 예정이라 지금 계정에는 넣지 않고, 옮긴 뒤 새 계정에서 설정함(`docs/cloudflare-tunnel.md`).
 - 공개 사진은 여전히 하루 동안 캐시됨. 숨긴 사진이 그동안 남는 것은 이미지 최적화에서 받아들인 비용이며 이번 변경과 무관함.
 - 캐시를 허용하는 핸들러가 늘어나면 그때마다 "이 응답이 사람에 따라 달라지는가"를 확인해야 함. 지금은 사진 응답 하나뿐임.

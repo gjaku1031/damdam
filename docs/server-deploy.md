@@ -45,9 +45,11 @@ bash scripts/deploy-server.sh
 
 ## 도메인과 HTTPS
 
-기존 Cloudflare Tunnel이 `http://localhost:3000`으로 전달하는 경우 Compose의 기본 웹 포트를 그대로 사용할 수 있습니다. `.env`의 `WEB_ORIGIN=https://damdamwood.co.kr`, `SESSION_COOKIE_SECURE=true`를 설정합니다. 외부 역방향 프록시는 원래 요청의 `X-Forwarded-Proto`를 전달해야 합니다. 브라우저는 같은 도메인의 `/api`를 사용합니다.
+운영 서버는 [Cloudflare Tunnel](cloudflare-tunnel.md)이 `http://localhost:3000`으로 전달하므로 Compose의 기본 웹 포트를 그대로 사용합니다. `.env`의 `WEB_ORIGIN=https://damdamwood.co.kr`, `SESSION_COOKIE_SECURE=true`를 설정합니다. 외부 역방향 프록시는 원래 요청의 `X-Forwarded-Proto`를 전달해야 합니다. 브라우저는 같은 도메인의 `/api`를 사용합니다.
 
 직접 외부에 웹 포트를 공개하려면 `WEB_BIND_HOST=0.0.0.0`을 지정하고 서버의 HTTPS 프록시를 구성합니다. API와 DB는 내부 또는 로컬 연결로 접근합니다.
+
+운영 서버는 수동 Deploy 워크플로로만 바뀝니다([CI/CD](cicd.md)).
 
 ## 운영 명령
 

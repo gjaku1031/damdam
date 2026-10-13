@@ -1,61 +1,34 @@
 # Cloudflare Tunnel
 
-Cloudflare Tunnel is the public ingress. Do not add nginx or caddy for this deployment.
+운영 사이트(`https://damdamwood.co.kr`)의 공개 입구는 Cloudflare Tunnel 하나입니다. 서버에 nginx·caddy를 두지 않으며 HTTPS와 CDN 캐시도 Cloudflare가 맡습니다.
 
-## Current Server State
+## 현재 구성
 
-- `cloudflared` is installed.
-- `cloudflared` systemd service is active.
-- Target tunnel hostname: `damdamwood.co.kr`.
-- Local app health is passing:
-  - Web: `http://127.0.0.1:3000`
-  - API: `http://127.0.0.1:4000/api/products`
-- Current remote tunnel config observed after the domain correction was `damdamwoodshop.co.kr` -> `http://localhost:3000`.
-- Because of that remote config, `damdamwood.co.kr` resolves through Cloudflare but returns `404` until the dashboard-managed ingress hostname is changed.
+2026-10-13에 운영 서버에서 확인한 상태입니다.
 
-## Required Routing
+- `cloudflared`는 systemd 서비스로 실행하며 `tunnel run --token <토큰>` 방식입니다. 터널의 호스트 이름과 전달 대상은 서버 파일이 아니라 Cloudflare 대시보드에서 관리합니다.
+- 공개 호스트 이름 `damdamwood.co.kr`을 `http://localhost:3000`(웹 컨테이너)으로 전달합니다.
+- 웹 컨테이너는 `127.0.0.1:3000`에만 바인딩합니다. API 컨테이너는 호스트에 포트를 열지 않으며 웹이 `/api/*`를 내부 API로 프록시하므로 터널 규칙은 이 하나면 됩니다.
+- 이 구성에서 서버 `.env`는 `WEB_ORIGIN=https://damdamwood.co.kr`, `SESSION_COOKIE_SECURE=true`여야 합니다([서버 운영](server-deploy.md)의 도메인과 HTTPS 참고).
 
-The app has two local services:
+## 계정 이전 예정
 
-| Service | Local URL |
-| --- | --- |
-| Web | `http://localhost:3000` |
-| API | `http://localhost:4000` |
+Cloudflare를 다른 계정으로 옮길 예정입니다. 터널 토큰·DNS·캐시 설정은 모두 계정에 속하므로 옮긴 뒤 새 계정에서 다시 만들어야 합니다. 지금 계정에는 설정을 더 추가하지 않고, 아래 항목을 이전할 때 함께 처리합니다.
 
-Configure Cloudflare Tunnel so the public site reaches both services.
+1. 새 계정에 도메인을 추가하고 네임서버를 변경합니다.
+2. 새 계정에서 터널을 만들고 공개 호스트 이름 `damdamwood.co.kr` → `http://localhost:3000`을 등록합니다.
+3. 서버의 `cloudflared` 서비스를 새 터널 토큰으로 다시 설치합니다. 토큰은 저장소와 문서에 적지 않습니다.
+4. 캐시 방어를 한 겹 더 둡니다. Cache Deception Armor를 켜고, `/api/*` 가운데 사진 주소만 캐시 대상으로 두는 규칙을 추가합니다. 지금은 API가 모든 응답에 붙이는 `Cache-Control: no-store` 한 겹에만 기대고 있습니다([응답 캐시 설계](response-cache-tradeoffs.md)).
+5. 아래 확인을 다시 실행합니다.
 
-Recommended:
-
-- `damdamwood.co.kr` -> `http://localhost:3000`
-
-The Next.js app rewrites `/api/*` to the local API, so this single-host rule is enough for the current deployment.
-
-Optional explicit split:
-
-- `damdamwood.co.kr` -> `http://localhost:3000`
-- `damdamwood.co.kr/api/*` -> `http://localhost:4000`
-
-Alternative:
-
-- `damdamwood.co.kr` -> `http://localhost:3000`
-- `api.damdamwood.co.kr` -> `http://localhost:4000`
-
-If using the alternative API hostname, update `NEXT_PUBLIC_API_BASE_URL` in `.env.production` before building.
-
-## Checks
+## 확인
 
 ```bash
-systemctl status cloudflared
+systemctl is-active cloudflared
 journalctl -u cloudflared -n 100 --no-pager
-curl -fsS http://127.0.0.1:3000
-curl -fsS http://127.0.0.1:4000/api/products
-curl -fsS https://damdamwood.co.kr
+curl -fsS -o /dev/null http://127.0.0.1:3000/login
+curl -fsS https://damdamwood.co.kr/api/health
+curl -sI 'https://damdamwood.co.kr/api/products;check.jpg'
 ```
 
-If public health still fails, check the active remote ingress from the server:
-
-```bash
-journalctl -u cloudflared -n 100 --no-pager | grep 'Updated to new configuration'
-```
-
-The hostname must be `damdamwood.co.kr`, and the service must be `http://localhost:3000`.
+마지막 명령의 응답은 `cache-control: no-store`이고 `cf-cache-status`가 `HIT`이 아니어야 합니다.
