@@ -52,14 +52,6 @@ pnpm build
 # API만: cd apps/api && ./gradlew test / ./gradlew bootRun / ./gradlew bootJar
 ```
 
-실제 Compose와 브라우저 검증은 **별도 테스트 환경**에서 실행합니다. 운영자 비밀번호는 환경 비밀로 설정하고 명령/리포트에 기록하지 않습니다.
-
-```bash
-# E2E_ADMIN_PASSWORD를 환경 비밀로 설정
-E2E_BASE_URL=http://localhost:3002 E2E_ALLOW_MUTATIONS=true \
-  E2E_ADMIN_USERNAME=admin pnpm test:e2e
-```
-
-브라우저 검증은 가입·세션·권한·상품/재고/CMS 수정·초안 저장/복구/충돌·사진/발행·댓글·이메일 없는 주문·PC/모바일 화면을 실제 API와 확인합니다. 테스트는 계정·주문과 콘텐츠를 생성하므로 운영 도메인에서 실행하지 않습니다.
+브라우저 화면은 자동 테스트 대상이 아닙니다. 화면을 바꾸면 Compose나 로컬 개발 서버를 띄워 실제 브라우저로 확인합니다.
 
 CI는 웹 타입 검사, API 컴파일·주석 검사, API 테스트, 빌드를 실행합니다. [코드 컨벤션](docs/convention/CODE.md), [서버 운영](docs/server-deploy.md), [CI/CD](docs/cicd.md)를 참고하세요.
