@@ -38,6 +38,8 @@ public final class OrderController {
     /**
      * 주문 생성
      *
+     * 회원 한 명의 결제 대기 주문이 5건이면 409로 거부
+     *
      * @return 생성한 주문
      */
     @PostMapping

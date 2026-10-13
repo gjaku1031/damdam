@@ -70,6 +70,7 @@ import lombok.RequiredArgsConstructor;
  * 동시 주문이 재고를 초과하지 않고, 실패 시 주문·재고·이력이 함께 롤백됨
  * 재고는 주문할 때 차감하고, 입금 기한이 지난 결제 대기 주문은 자동 취소로 재고를 되돌림
  * 주문 상태를 바꾸는 모든 경로는 주문 행을 먼저 잠근 뒤 옵션 행을 잠금(주문 → 옵션 순서)
+ * 고객 주문 생성은 그보다 먼저 회원 행을 잠가 결제 대기 주문 수 제한을 확인(회원 → 옵션 순서)
  */
 @Service
 @RequiredArgsConstructor
@@ -105,6 +106,13 @@ public class OrderService {
      * 운영 기록의 주문 대상 종류
      */
     private static final String AUDIT_TARGET = "ORDERS";
+
+    /**
+     * 회원 한 명이 동시에 둘 수 있는 결제 대기 주문 수
+     *
+     * 재고는 주문할 때 차감하므로, 입금 없이 주문만 쌓아 입금 기한 동안 재고를 묶어 두는 것을 막는 상한
+     */
+    private static final int MAX_PENDING_ORDERS = 5;
 
     /**
      * 주문 저장소
@@ -154,12 +162,18 @@ public class OrderService {
     /**
      * 고객 주문 생성
      *
+     * 하나의 트랜잭션에서 실행, 실패 시 주문·재고 차감·재고 이력이 함께 롤백됨
+     *
+     * 1. 회원 행을 잠근 뒤 결제 대기 주문 수 제한 확인
+     * 2. 주문 저장과 재고 차감
+     *
      * @param userId 주문자 ID
      * @return 주문 상품·상태 이력을 포함한 결제 대기 주문
-     * @throws ApiException 옵션 중복·판매하지 않는 옵션·재고 부족(400)
+     * @throws ApiException 옵션 중복·판매하지 않는 옵션·재고 부족(400), 주문자 없음(401), 결제 대기 주문이 상한에 찼을 때(409)
      */
     @Transactional
     public OrderResponse create(UUID userId, CreateOrderRequest request) {
+        assertPendingOrderLimit(userId);
         Placed placed = place(userId, request.items(), request.paymentMethodOrDefault(), request.contact(),
                 ChangeActorType.CUSTOMER, userId, "주문 생성");
         return OrderResponse.of(placed.order(), placed.items().stream().map(OrderItemResponse::from).toList(),
@@ -201,6 +215,24 @@ public class OrderService {
                 "주문 %s 대리 생성 · 회원 %s · 원 주문 %s · %s".formatted(order.getOrderNo(), customer.getUsername(),
                         source.getOrderNo(), request.paidRequested() ? "입금 확인" : "결제 대기"));
         return detail(order);
+    }
+
+    /**
+     * 결제 대기 주문 수 제한 확인
+     *
+     * 건수만 세면 같은 회원의 동시 주문이 모두 상한 직전 값을 보고 함께 통과하므로, 회원 행을 먼저 잠가 한 줄로 세움
+     * 잠금은 주문 트랜잭션이 끝날 때 풀림
+     * 운영자 대리 주문은 운영자가 직접 넣는 주문이라 이 제한을 적용하지 않음
+     *
+     * @param userId 주문자 ID
+     * @throws ApiException 주문자가 없거나 탈퇴했을 때(401), 결제 대기 주문이 {@link #MAX_PENDING_ORDERS}건 이상일 때(409)
+     */
+    private void assertPendingOrderLimit(UUID userId) {
+        users.findForUpdate(userId).orElseThrow(() -> ApiException.unauthorized("다시 로그인해주세요."));
+        if (orders.countByUserIdAndStatus(userId, OrderStatus.PENDING_PAYMENT) >= MAX_PENDING_ORDERS) {
+            throw ApiException.conflict("입금 대기 중인 주문이 %d건 있어 새로 주문할 수 없습니다. 입금하거나 취소한 뒤 다시 주문해주세요."
+                    .formatted(MAX_PENDING_ORDERS));
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 import io.github.gjaku1031.damdam.order.domain.OrderEntity;
+import io.github.gjaku1031.damdam.order.domain.OrderStatus;
 import jakarta.persistence.LockModeType;
 
 /**
@@ -47,4 +48,11 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
      * @return 주문, 없으면 빈 값
      */
     Optional<OrderEntity> findByOrderNo(String orderNo);
+
+    /**
+     * 회원의 해당 상태 주문 수
+     *
+     * @return 주문 수
+     */
+    long countByUserIdAndStatus(UUID userId, OrderStatus status);
 }
