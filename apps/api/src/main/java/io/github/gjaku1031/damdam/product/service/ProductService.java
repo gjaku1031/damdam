@@ -215,7 +215,7 @@ public class ProductService {
      * 상품 등록·수정 공통 처리
      *
      * 1. 사진 키가 검증된 업로드인지 트랜잭션 밖에서 먼저 확인
-     * 2. 기존 상품이면 행 잠금 후 필드 반영, 옵션·사진 교체
+     * 2. 기존 상품이면 행 잠금 후 필드 반영, 옵션·사진 교체(사진은 트랜잭션 안에서 잠그며 한 번 더 확인)
      * 3. 커밋 후 응답용으로 다시 조회
      *
      * 2단계 실패 시 상품·옵션·사진 변경이 함께 롤백됨
@@ -328,9 +328,13 @@ public class ProductService {
     /**
      * 사진 목록 교체
      *
-     * 표시 순서 유일 제약 때문에 기존 사진을 즉시 삭제한 뒤 입력 순서로 저장
+     * 1. 사진 티켓을 공유 잠금으로 다시 확인, 이 트랜잭션이 끝날 때까지 정리 작업이 연결하려는 사진을 지우지 못함
+     * 2. 표시 순서 유일 제약 때문에 기존 사진을 즉시 삭제한 뒤 입력 순서로 저장
+     *
+     * @throws ApiException 사전 확인 뒤에 정리 작업이 사진을 지웠을 때(400)
      */
     private void replaceImages(UUID productId, List<ImageInput> inputs) {
+        inputs.forEach(image -> storage.assertUsable(image.objectKey()));
         images.deleteAllOfProduct(productId);
         List<ProductImageEntity> next = new ArrayList<>();
         for (int sortOrder = 0; sortOrder < inputs.size(); sortOrder++) {

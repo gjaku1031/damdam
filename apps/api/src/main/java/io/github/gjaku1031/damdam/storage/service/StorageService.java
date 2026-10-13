@@ -10,6 +10,7 @@ import static io.github.gjaku1031.damdam.jooq.Tables.PRODUCT_IMAGES;
 import static io.github.gjaku1031.damdam.jooq.Tables.STORAGE_UPLOAD_TICKETS;
 import static org.jooq.impl.DSL.exists;
 import static org.jooq.impl.DSL.falseCondition;
+import static org.jooq.impl.DSL.not;
 import static org.jooq.impl.DSL.selectOne;
 
 import java.io.IOException;
@@ -20,12 +21,17 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
+import org.jooq.impl.SQLDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -59,6 +65,13 @@ import lombok.RequiredArgsConstructor;
  *   <li>원본에는 촬영 위치 등 메타데이터가 남아 있으므로 변환본이 있으면 원본을 내보내지 않음</li>
  * </ul>
  *
+ * 쓰이지 않는 업로드 정리
+ * <ul>
+ *   <li>어디에도 연결되지 않은 채 {@link #ORPHAN_GRACE}가 지난 업로드의 원본·변환본·티켓을 삭제</li>
+ *   <li>사진은 먼저 올린 뒤 상품·글을 저장할 때 연결되므로, 올린 직후의 사진을 지우지 않도록 유예 시간을 둠</li>
+ *   <li>사진을 연결하는 쪽은 {@link #assertUsable}로 티켓을 공유 잠금, 정리하는 쪽은 배타 잠금 후 다시 확인</li>
+ * </ul>
+ *
  * 사진 접근 권한 판단
  * 1. 공개된 게시글·상품·공지/FAQ 본문에 쓰인 사진이면 허용, 누구에게나 같은 응답이므로 캐시 허용
  * 2. 운영자면 모든 사진 허용
@@ -69,6 +82,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class StorageService {
     /**
+     * 파일 삭제 실패 로거
+     */
+    private static final Logger log = LoggerFactory.getLogger(StorageService.class);
+
+    /**
      * 업로드 사진 최대 크기(바이트, 5MB)
      */
     private static final int MAX_BYTES = 5 * 1024 * 1024;
@@ -77,6 +95,13 @@ public class StorageService {
      * 업로드 티켓 유효 시간
      */
     private static final Duration TICKET_TTL = Duration.ofMinutes(30);
+
+    /**
+     * 연결되지 않은 업로드를 지우기 전에 기다리는 시간
+     *
+     * 사진을 올린 뒤 상품·글을 저장하기 전까지는 사용처가 없으므로, 편집 중인 사진이 지워지지 않을 만큼의 여유
+     */
+    private static final Duration ORPHAN_GRACE = Duration.ofHours(24);
 
     /**
      * 허용 MIME 형식별 저장 파일 확장자
@@ -105,12 +130,12 @@ public class StorageService {
     private final ImageConverter converter;
 
     /**
-     * 변환이 끝난 뒤의 저장 구간만 묶는 트랜잭션 실행기
+     * 변환이 끝난 뒤의 저장 구간, 티켓 하나의 삭제 구간만 묶는 트랜잭션 실행기
      */
     private final TransactionTemplate transaction;
 
     /**
-     * 사진 사용처 확인·티켓 일괄 실패 처리용 jOOQ
+     * 사진 사용처 확인·티켓 일괄 실패 처리·정리 대상 조회용 jOOQ
      */
     private final DSLContext dsl;
 
@@ -185,14 +210,17 @@ public class StorageService {
      * 본문·상품에 연결할 사진 확인
      *
      * 검증을 마친 업로드 사진이거나 상위 경로 이동이 없는 기존 정적 사진이어야 함
+     * 업로드 사진은 티켓을 공유 잠금으로 읽음. 사진을 연결하는 트랜잭션 안에서 호출하면 그 트랜잭션이 끝날 때까지
+     * {@link #deleteIfOrphan}이 같은 사진을 지우지 못하고, 이미 지워진 사진이면 여기서 거부됨
+     * 트랜잭션 밖에서 호출하면 잠금이 바로 풀리므로 사전 확인으로만 쓰고, 연결하는 트랜잭션 안에서 한 번 더 호출해야 함
      *
      * @param key 업로드 사진 키 또는 {@code /images/...} 경로
      * @throws ApiException 검증을 마친 업로드가 아닐 때(400)
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public void assertUsable(String key) {
         if (key.startsWith(ImageKeys.LEGACY_PREFIX) && !key.contains("..")) return;
-        if (!tickets.existsByObjectKeyAndStatus(key, StorageUploadTicketStatus.VERIFIED)) {
+        if (tickets.findForShare(key, StorageUploadTicketStatus.VERIFIED).isEmpty()) {
             throw ApiException.badRequest("완료된 업로드를 사용해주세요.");
         }
     }
@@ -270,6 +298,103 @@ public class StorageService {
                 .where(STORAGE_UPLOAD_TICKETS.STATUS.eq(StorageUploadTicketStatus.ISSUED.name()))
                 .and(STORAGE_UPLOAD_TICKETS.EXPIRESAT.le(now))
                 .execute();
+    }
+
+    /**
+     * 정리 대상 업로드 티켓 ID 조회
+     *
+     * 잠금 없이 후보만 고름, 실제 삭제 여부는 {@link #deleteIfOrphan}이 티켓을 잠근 뒤 다시 판단
+     *
+     * @param limit 최대 건수
+     * @return 업로드·실패 처리 후 {@link #ORPHAN_GRACE}가 지났고 사용처가 없는 티켓 ID, 오래된 순
+     */
+    @Transactional(readOnly = true)
+    public List<UUID> orphanTicketIds(int limit) {
+        return dsl.select(STORAGE_UPLOAD_TICKETS.ID).from(STORAGE_UPLOAD_TICKETS)
+                .where(orphan(Instant.now().minus(ORPHAN_GRACE)))
+                .orderBy(STORAGE_UPLOAD_TICKETS.CREATEDAT, STORAGE_UPLOAD_TICKETS.ID)
+                .limit(limit)
+                .fetch(STORAGE_UPLOAD_TICKETS.ID);
+    }
+
+    /**
+     * 쓰이지 않는 업로드 하나 삭제
+     *
+     * 1. 티켓 행을 배타 잠금(사진을 연결하는 트랜잭션의 공유 잠금이 끝날 때까지 기다림)
+     * 2. 잠근 뒤에도 유예 시간이 지났고 사용처가 없는지 다시 확인, 그사이 연결됐으면 아무것도 지우지 않음
+     * 3. 티켓 행 삭제 후 커밋(이후 이 사진을 연결하려는 요청은 {@link #assertUsable}에서 거부됨)
+     * 4. 커밋된 뒤 원본과 변환본 파일 삭제
+     *
+     * 파일을 먼저 지우면 티켓 삭제가 롤백됐을 때 연결 가능한 티켓에 파일이 없는 상태가 되므로 행을 먼저 지움
+     * 4단계가 실패하면 티켓 없는 파일이 남고 오류 로그만 남김(사진으로는 더 이상 연결할 수 없음)
+     *
+     * @return 삭제했으면 {@code true}, 티켓이 없거나 그사이 연결됐으면 {@code false}
+     */
+    public boolean deleteIfOrphan(UUID ticketId) {
+        String key = transaction.execute(status -> {
+            StorageUploadTicketEntity ticket = tickets.findForUpdate(ticketId).orElse(null);
+            if (ticket == null) return null;
+            // 후보로 고른 뒤 잠그기 전에 상품·글에 연결됐을 수 있으므로 같은 조건으로 재확인
+            boolean stillOrphan = dsl.fetchExists(selectOne().from(STORAGE_UPLOAD_TICKETS)
+                    .where(STORAGE_UPLOAD_TICKETS.ID.eq(ticketId), orphan(Instant.now().minus(ORPHAN_GRACE))));
+            if (!stillOrphan) return null;
+            tickets.delete(ticket);
+            return ticket.getObjectKey();
+        });
+        if (key == null) return false;
+
+        // 티켓 삭제가 커밋된 뒤에만 파일 삭제
+        try {
+            files.delete(key);
+            for (ImageVariant variant : ImageVariant.values()) files.delete(ImageKeys.variantKey(key, variant));
+        } catch (IOException | RuntimeException error) {
+            log.error("쓰이지 않는 업로드 {}의 파일을 지우지 못했습니다", key, error);
+        }
+        return true;
+    }
+
+    /**
+     * 정리 대상 티켓 조건
+     *
+     * 검증을 마친 업로드는 업로드 시각, 실패 처리된 티켓은 실패 시각을 기준으로 유예 시간을 셈
+     * 실패 처리된 티켓은 연결할 수 없지만, 파일 저장 뒤 트랜잭션이 실패해 파일만 남았을 수 있어 함께 정리
+     * 발급만 된 티켓은 만료 후 {@link #failExpiredTickets}가 실패 처리한 뒤에 대상이 됨
+     *
+     * @param cutoff 이 시각 이전에 업로드·실패 처리된 티켓만 대상
+     * @return 유예 시간이 지났고 사용처가 없으면 참인 조건
+     */
+    private static Condition orphan(Instant cutoff) {
+        return STORAGE_UPLOAD_TICKETS.STATUS.eq(StorageUploadTicketStatus.VERIFIED.name())
+                .and(STORAGE_UPLOAD_TICKETS.VERIFIEDAT.le(cutoff))
+                .or(STORAGE_UPLOAD_TICKETS.STATUS.eq(StorageUploadTicketStatus.FAILED.name())
+                        .and(STORAGE_UPLOAD_TICKETS.FAILEDAT.le(cutoff)))
+                .and(not(referenced(STORAGE_UPLOAD_TICKETS.OBJECTKEY)));
+    }
+
+    /**
+     * 사진 사용처 조건
+     *
+     * 공개 여부·삭제 여부와 관계없이 DB에 남아 있는 모든 사용처를 셈
+     * 숨긴 상품, 임시글, 삭제 표시만 된 상품·글은 되살릴 수 있고 주문 내역은 계속 보여야 하기 때문임
+     * <ul>
+     *   <li>상품 사진, 게시글 발행 사진, 주문 상품의 대표 사진 스냅샷: 키 일치</li>
+     *   <li>게시글 대표 사진: 키 일치, 발행 본문 HTML·발행 문서·초안: 키 포함</li>
+     *   <li>공지/FAQ 본문 HTML: 키 포함</li>
+     * </ul>
+     * 사진 키를 저장하는 곳을 새로 만들면 여기에 추가해야 함, 빠뜨리면 쓰고 있는 사진이 지워짐
+     *
+     * @param key 업로드 사진 키 열
+     * @return 사용처가 하나라도 있으면 참인 조건
+     */
+    private static Condition referenced(Field<String> key) {
+        return exists(selectOne().from(PRODUCT_IMAGES).where(PRODUCT_IMAGES.OBJECTKEY.eq(key)))
+                .or(exists(selectOne().from(CMS_POST_IMAGES).where(CMS_POST_IMAGES.OBJECTKEY.eq(key))))
+                .or(exists(selectOne().from(ORDER_ITEMS).where(ORDER_ITEMS.THUMBNAILIMAGEURLSNAPSHOT.eq(key))))
+                .or(exists(selectOne().from(ADMIN_UPDATES).where(ADMIN_UPDATES.COVEROBJECTKEY.eq(key)
+                        .or(ADMIN_UPDATES.BODYHTML.contains(key))
+                        .or(ADMIN_UPDATES.DOCUMENTJSON.cast(SQLDataType.CLOB).contains(key))
+                        .or(ADMIN_UPDATES.DRAFT.cast(SQLDataType.CLOB).contains(key)))))
+                .or(exists(selectOne().from(CMS_CONTENTS).where(CMS_CONTENTS.BODYHTML.contains(key))));
     }
 
     /**

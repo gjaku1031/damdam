@@ -15,7 +15,7 @@ import io.github.gjaku1031.damdam.storage.service.StorageService;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 시간이 지나면 정리해야 하는 데이터(입금 기한이 지난 주문, 업로드 티켓)의 주기적 처리와 재고·이력 대조 점검
+ * 시간이 지나면 정리해야 하는 데이터(입금 기한이 지난 주문, 업로드 티켓, 쓰이지 않는 업로드 사진)의 주기적 처리와 재고·이력 대조 점검
  *
  * 트랜잭션은 각 대상 서비스에서 처리
  */
@@ -31,6 +31,11 @@ public final class SchedulerService {
      * 한 번 실행에 처리할 기한 지난 주문 최대 건수, 남은 주문은 다음 실행에서 처리
      */
     private static final int OVERDUE_BATCH_SIZE = 500;
+
+    /**
+     * 한 번 실행에 지울 업로드 최대 건수, 남은 업로드는 다음 실행에서 처리
+     */
+    private static final int ORPHAN_BATCH_SIZE = 200;
 
     /**
      * 주문 서비스
@@ -78,6 +83,29 @@ public final class SchedulerService {
     public void failExpiredTickets() {
         int count = storage.failExpiredTickets();
         if (count > 0) log.info("{}건의 만료된 업로드 티켓을 정리했습니다", count);
+    }
+
+    /**
+     * 어디에도 연결되지 않은 채 하루가 지난 업로드 사진 삭제, 매시 15분 실행
+     *
+     * 티켓마다 별도 트랜잭션으로 처리해 한 건의 실패가 다른 건을 막지 않음
+     * 여러 인스턴스가 같은 티켓을 동시에 처리해도 티켓 행 잠금과 재확인으로 한 번만 삭제됨
+     */
+    @Scheduled(cron = "0 15 * * * *")
+    public void removeOrphanUploads() {
+        int removed = 0;
+        int failed = 0;
+        for (UUID id : storage.orphanTicketIds(ORPHAN_BATCH_SIZE)) {
+            try {
+                if (storage.deleteIfOrphan(id)) removed++;
+            } catch (RuntimeException e) {
+                failed++;
+                log.error("쓰이지 않는 업로드 티켓 {} 정리에 실패했습니다", id, e);
+            }
+        }
+        if (removed > 0 || failed > 0) {
+            log.info("쓰이지 않는 업로드 {}건을 지웠습니다 (실패 {}건)", removed, failed);
+        }
     }
 
     /**
