@@ -9,16 +9,48 @@ export class ApiError extends Error {
     super(message)
   }
 }
+/**
+ * 세션에 묶인 CSRF 토큰. 상태를 바꾸는 요청마다 `X-CSRF-Token` 헤더로 보냄.
+ * 동시에 여러 요청이 시작돼도 한 번만 받도록 진행 중인 요청을 보관
+ */
+let csrfToken: Promise<string> | null = null
+/** 로그인·가입·로그아웃·탈퇴는 세션을 바꾸므로 성공하면 보관한 토큰을 버림 */
+const SESSION_CHANGING = ['/auth/login', '/auth/register', '/auth/logout', '/auth/withdraw']
+
+function loadCsrfToken(): Promise<string> {
+  csrfToken ??= fetch(API_BASE + '/auth/csrf', { cache: 'no-store', credentials: 'include' })
+    .then((res) => (res.ok ? res.json() : Promise.reject(new Error('보안 토큰을 받지 못했습니다.'))))
+    .then((body: { token: string }) => body.token)
+    .catch((error) => {
+      // 실패한 요청을 보관해 두면 다음 요청도 계속 실패하므로 비움
+      csrfToken = null
+      throw error
+    })
+  return csrfToken
+}
+
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(API_BASE + path, {
-    cache: 'no-store',
-    ...options,
-    credentials: 'include',
-    headers: {
-      ...(options?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      ...options?.headers,
-    },
-  })
+  const unsafe = !['GET', 'HEAD'].includes((options?.method ?? 'GET').toUpperCase())
+  const send = (token?: string) =>
+    fetch(API_BASE + path, {
+      cache: 'no-store',
+      ...options,
+      credentials: 'include',
+      headers: {
+        ...(options?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+        ...(token ? { 'X-CSRF-Token': token } : {}),
+        ...options?.headers,
+      },
+    })
+  const token = unsafe ? await loadCsrfToken() : undefined
+  let res = await send(token)
+  // 세션이 만료되거나 다른 탭에서 로그인해 토큰이 바뀌었으면 새 토큰으로 한 번만 다시 보냄.
+  // 새로 받은 토큰이 같다면 권한 문제로 거부된 것이므로 그대로 오류 처리
+  if (unsafe && res.status === 403) {
+    csrfToken = null
+    const fresh = await loadCsrfToken()
+    if (fresh !== token) res = await send(fresh)
+  }
   if (!res.ok) {
     const error = await res.json().catch(() => null)
     throw new ApiError(
@@ -29,6 +61,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       error?.fields,
     )
   }
+  if (SESSION_CHANGING.includes(path)) csrfToken = null
   return res.json()
 }
 export const mutate = <T>(path: string, method: string, data?: unknown) =>

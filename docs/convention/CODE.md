@@ -86,6 +86,8 @@ Java API(`apps/api`)의 접근 범위·생성자 주입·JPA 엔티티·jOOQ·nu
 - 모든 응답의 기본 캐시 정책은 `no-store`(`NoStoreByDefaultFilter`). CDN은 캐시 지시가 없는 응답을 주소의 확장자만 보고 저장하고 쿠키를 구분하지 않으므로, 오류 응답과 JSON 응답에 이 기본값이 빠지면 안 됨.
 - 캐시를 허용할 응답은 핸들러가 `ResponseEntity.cacheControl`로 명시. 로그인 여부·사용자에 따라 내용이 달라지는 응답에는 허용하지 않음.
 - `POST` 생성·명령 핸들러는 `@ResponseStatus(HttpStatus.CREATED)`. 로그인·로그아웃처럼 200이 계약인 경우만 생략.
+- 상태를 바꾸는 요청(`GET`·`HEAD`·`OPTIONS`·`TRACE`가 아닌 모든 컨트롤러 요청)은 `CsrfInterceptor`가 `X-CSRF-Token` 헤더를 세션의 토큰과 비교하고 다르면 403. 로그인·가입도 예외가 아님. 토큰은 `GET /api/auth/csrf`로 받으며 세션마다 하나이고, 로그인·로그아웃으로 세션이 바뀌면 다시 받아야 함.
+- 웹은 `fetchApi`(`apps/web/lib/api.ts`)가 토큰을 받아 싣고, 403이면 토큰을 새로 받아 값이 달라졌을 때만 한 번 다시 보냄. API를 `fetchApi` 밖에서 직접 호출하는 코드를 만들지 않음.
 - 로그인 필요 핸들러는 `@LoginRequired`, 운영자 전용은 `@AdminOnly`. `/api/admin/**`은 표시와 관계없이 운영자 검사. 현재 사용자는 `CurrentUser` 매개변수로 받음.
 - 운영 컨트롤러(`/admin/**`)는 클래스에 `@AdminOnly`를 함께 붙임. 경로 검사와 표시 가운데 하나가 빠져도 다른 하나가 막도록 함.
 - 권한·기록처럼 요청 경로로 판단하는 코드는 `RequestPaths.segments`를 사용. 원본 URI(`getRequestURI`)는 퍼센트 인코딩과 `;` 경로 매개변수가 남아 있어 핸들러 매핑과 결과가 달라지므로 판단에 쓰지 않음.

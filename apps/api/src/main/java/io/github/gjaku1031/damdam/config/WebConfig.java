@@ -13,6 +13,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.util.pattern.PathPatternParser;
 
 import io.github.gjaku1031.damdam.common.auth.AuthInterceptor;
+import io.github.gjaku1031.damdam.common.auth.CsrfInterceptor;
 import io.github.gjaku1031.damdam.common.auth.CurrentUserArgumentResolver;
 import lombok.RequiredArgsConstructor;
 
@@ -24,6 +25,11 @@ import lombok.RequiredArgsConstructor;
 @Configuration
 @RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
+    /**
+     * CSRF 토큰 검사기
+     */
+    private final CsrfInterceptor csrfInterceptor;
+
     /**
      * 로그인·운영자 권한 검사기
      */
@@ -48,12 +54,15 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     /**
-     * 인증 인터셉터 등록
+     * CSRF·인증 인터셉터 등록
+     *
+     * 토큰 검사를 먼저 두어, 위조된 요청은 계정 조회 전에 거부
      *
      * @param registry 인터셉터 목록
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(csrfInterceptor);
         registry.addInterceptor(authInterceptor);
     }
 

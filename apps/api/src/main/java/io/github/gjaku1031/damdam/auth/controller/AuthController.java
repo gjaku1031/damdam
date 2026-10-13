@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import io.github.gjaku1031.damdam.auth.dto.AuthUserResponse;
 import io.github.gjaku1031.damdam.auth.dto.ChangePasswordRequest;
+import io.github.gjaku1031.damdam.auth.dto.CsrfTokenResponse;
 import io.github.gjaku1031.damdam.auth.dto.LoginRequest;
 import io.github.gjaku1031.damdam.auth.dto.RegisterRequest;
 import io.github.gjaku1031.damdam.auth.dto.SessionResponse;
@@ -19,6 +20,7 @@ import io.github.gjaku1031.damdam.auth.dto.SignInResponse;
 import io.github.gjaku1031.damdam.auth.dto.WithdrawRequest;
 import io.github.gjaku1031.damdam.auth.service.AuthService;
 import io.github.gjaku1031.damdam.auth.service.LoginRateLimiter;
+import io.github.gjaku1031.damdam.common.auth.CsrfTokens;
 import io.github.gjaku1031.damdam.common.auth.CurrentUser;
 import io.github.gjaku1031.damdam.common.auth.LoginRequired;
 import io.github.gjaku1031.damdam.common.auth.SessionUser;
@@ -32,7 +34,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 가입·로그인·로그아웃, 세션 사용자 조회, 비밀번호 변경·탈퇴 API
+ * 가입·로그인·로그아웃, 세션 사용자 조회, CSRF 토큰 발급, 비밀번호 변경·탈퇴 API
  */
 @RestController
 @RequestMapping("/auth")
@@ -95,6 +97,19 @@ public final class AuthController {
     public AuthUserResponse me(HttpServletRequest request) {
         return SessionUser.id(request).flatMap(auth::activeUser).map(AuthUserResponse::from)
                 .orElseThrow(() -> ApiException.unauthorized(null));
+    }
+
+    /**
+     * 현재 세션의 CSRF 토큰 발급
+     *
+     * 세션이 없으면 만들어 토큰을 저장, 같은 세션에서는 항상 같은 값
+     * 로그인·가입·로그아웃으로 세션이 바뀐 뒤에는 다시 받아야 함
+     *
+     * @return 토큰
+     */
+    @GetMapping("/csrf")
+    public CsrfTokenResponse csrf(HttpServletRequest request) {
+        return new CsrfTokenResponse(CsrfTokens.issue(request));
     }
 
     /**
@@ -183,6 +198,8 @@ public final class AuthController {
         // 사용자 ID·권한 기록
         session.setAttribute(SessionUser.USER_ID, user.getId().toString());
         session.setAttribute(SessionUser.ROLE, user.getRole().name());
+        // 토큰을 세션과 함께 만들어 둠. 나중에 발급하면 로그인 직후 동시에 온 토큰 요청들이 서로 다른 값을 받음
+        CsrfTokens.issue(request);
         return SignInResponse.of(AuthUserResponse.from(user));
     }
 
