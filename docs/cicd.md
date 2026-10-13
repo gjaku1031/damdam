@@ -1,6 +1,6 @@
 # CI/CD
 
-`.github/workflows/ci.yml`은 PR과 main/dev push에서 Node.js 22, pnpm 9.15.9, JDK 25(Temurin)로 `pnpm lint`와 `pnpm build`를 실행합니다. lint는 웹 타입 검사와 API 컴파일, 주석 컨벤션 검사(`scripts/check-javadoc.py`)를 포함하며 위반이 있으면 실패합니다. build는 Next.js 빌드와 API 실행 JAR(`apps/api/build/libs/damdam-api.jar`)을 만듭니다. 현재 API 테스트는 없으며 DB 서비스 컨테이너도 사용하지 않습니다.
+`.github/workflows/ci.yml`은 PR과 main/dev push에서 Node.js 22, pnpm 9.15.9, JDK 25(Temurin)로 `pnpm lint`, `pnpm test`, `pnpm build`를 실행합니다. lint는 웹 타입 검사와 API·테스트 컴파일, 주석 컨벤션 검사(`scripts/check-javadoc.py`)를 포함하며 위반이 있으면 실패합니다. test는 API 단위·통합 테스트이며, 통합 테스트는 Testcontainers로 PostgreSQL 16 컨테이너를 띄워 실제 서버에 HTTP로 요청합니다(러너의 Docker 사용, 별도 DB 서비스 컨테이너 설정 없음). build는 Next.js 빌드와 API 실행 JAR(`apps/api/build/libs/damdam-api.jar`)을 만듭니다.
 
 `.github/workflows/deploy.yml`은 수동 실행(`workflow_dispatch`)으로만 배포합니다. push로 운영 서버가 바뀌지 않습니다. 서버에 Docker와 Compose v2, 배포 경로의 완성된 `.env`가 있어야 합니다.
 

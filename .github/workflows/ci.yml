@@ -39,9 +39,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 웹 타입 검사, API 컴파일과 주석 컨벤션 검사(scripts/check-javadoc.py)
+      # 웹 타입 검사, API·테스트 컴파일과 주석 컨벤션 검사(scripts/check-javadoc.py)
       - name: Lint and typecheck
         run: pnpm lint
+
+      # API 단위·통합 테스트. 통합 테스트는 Testcontainers로 PostgreSQL 16 컨테이너를 띄움(러너의 Docker 사용)
+      - name: Test
+        run: pnpm test
 
       - name: Build
         run: pnpm build

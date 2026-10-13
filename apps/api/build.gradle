@@ -41,6 +41,12 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
 
     jooqCodegen 'org.jooq:jooq-meta-extensions:3.21.8'
+
+    // 실제 서버·PostgreSQL 컨테이너로 실행하는 통합 테스트와 단위 테스트
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 sourceSets {
@@ -88,6 +94,15 @@ jooq {
 }
 tasks.named('jooqCodegen') { inputs.dir(baselineSchema) }
 tasks.named('compileJava') { dependsOn tasks.named('jooqCodegen') }
+
+// JUnit Platform으로 실행하고 실패한 테스트의 원인을 콘솔에 표시
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+    }
+}
 
 tasks.named('bootJar') { archiveFileName = 'damdam-api.jar' }
 tasks.named('jar') { enabled = false }

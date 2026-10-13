@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "./gradlew bootRun",
     "build": "./gradlew --no-daemon -q bootJar",
-    "lint": "./gradlew --no-daemon -q compileJava && python3 -I ../../scripts/check-javadoc.py src/main/java"
+    "lint": "./gradlew --no-daemon -q compileJava compileTestJava && python3 -I ../../scripts/check-javadoc.py src/main/java src/test/java",
+    "test": "./gradlew --no-daemon -q test"
   }
 }

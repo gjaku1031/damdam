@@ -14,7 +14,7 @@ import pathlib
 import re
 import sys
 
-DEFAULT_ROOTS = ['apps/api/src/main/java']
+DEFAULT_ROOTS = ['apps/api/src/main/java', 'apps/api/src/test/java']
 TYPE_DECL = re.compile(r'^\s*(?:(?:public|protected|private|static|final|abstract|sealed|non-sealed|strictfp)\s+)*'
                        r'(class|interface|record|enum|@interface)\s+(\w+)')
 MODIFIERS = r'(?:(?:public|protected|private|static|final|abstract|default|synchronized|native|transient|volatile)\s+)*'

@@ -111,7 +111,18 @@ Java API(`apps/api`)의 접근 범위·생성자 주입·JPA 엔티티·jOOQ·nu
 - Spring Boot 4·Jackson 3 기준. Jackson 문자열 노드는 `isString`, `stringValue()`, 변환이 필요한 곳만 `asString()`.
 - deprecated API는 공식 대체 API와 동작을 확인한 뒤 교체. 경고를 억제하는 방식으로 해결하지 않음.
 
+## 테스트
+
+- 테스트는 `apps/api/src/test/java`에 대상과 같은 패키지 구조로 둠. 단위 테스트는 Spring 없이 대상 클래스만 실행.
+- 통합 테스트는 `fixture.IntegrationTest`를 상속. 실제 서버를 임의 포트로 띄우고 Testcontainers의 PostgreSQL 16에 Flyway 마이그레이션을 모두 적용한 뒤, `ApiClient`로 브라우저처럼(세션 쿠키·CSRF 토큰·출처 헤더) HTTP 요청을 보냄.
+- 모든 통합 테스트가 서버와 DB 하나를 함께 쓰고 DB를 테스트마다 비우지 않음. 각 테스트는 자기가 만든 데이터(`uniqueName`, 새로 등록한 상품)만으로 판단하고, 전체 건수나 "목록이 비어 있음"을 기대하지 않음.
+- 전역 설정(입금 기한 일수 등)을 바꾸는 테스트는 끝날 때 원래 값으로 되돌림.
+- 테스트에서는 스케줄러가 꺼져 있음(`damdam.scheduling.enabled=false`). 시간이 지나 실행되는 작업은 DB의 시각을 옮긴 뒤 스케줄러가 부르는 서비스 메서드를 직접 호출해 검증.
+- 동시성 규칙(재고 초과 판매, 결제 대기 주문 수 제한, 잠금 순서)은 실제로 동시에 요청을 보내 검증.
+- 테스트 메서드마다 검증 대상과 기대 결과를 Javadoc으로 적음([주석 컨벤션](COMMENTS.md)).
+
 ## 검증
 
 - 변경 후 `cd apps/api && ./gradlew --no-daemon compileJava`로 컴파일 경고·오류 확인.
+- `./gradlew --no-daemon test`로 단위·통합 테스트 통과 확인(Docker 필요). 동작을 바꿨으면 해당 테스트를 함께 추가·수정.
 - 엔티티·마이그레이션 변경 시 실제 PostgreSQL에서 기동해 Flyway와 Hibernate 스키마 검증(`ddl-auto: validate`) 통과 확인. 컴파일 성공만으로 영속 동작을 검증했다고 보고하지 않음.
