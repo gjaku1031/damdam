@@ -27,6 +27,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
      * 삭제되지 않은 계정 행 잠금 조회
      *
      * 같은 회원의 동시 요청을 한 줄로 세울 때 사용
+     * PostgreSQL에서는 FOR NO KEY UPDATE로 잠금(Hibernate의 {@code PESSIMISTIC_WRITE})
+     * 다른 테이블 INSERT의 외래 키 검사(FOR KEY SHARE)를 막지 않음, FOR UPDATE로 바꾸면 주문 경로 사이에 교착이 생김
      *
      * @return 잠근 계정, 없거나 삭제됐으면 빈 값
      */

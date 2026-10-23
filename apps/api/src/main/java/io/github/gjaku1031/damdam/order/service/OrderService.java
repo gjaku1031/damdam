@@ -71,6 +71,11 @@ import lombok.RequiredArgsConstructor;
  * 재고는 주문할 때 차감하고, 입금 기한이 지난 결제 대기 주문은 자동 취소로 재고를 되돌림
  * 주문 상태를 바꾸는 모든 경로는 주문 행을 먼저 잠근 뒤 옵션 행을 잠금(주문 → 옵션 순서)
  * 고객 주문 생성은 그보다 먼저 회원 행을 잠가 결제 대기 주문 수 제한을 확인(회원 → 옵션 순서)
+ *
+ * 옵션을 잠근 뒤에도 주문·재고 이력 INSERT의 외래 키 검사가 회원 행에 FOR KEY SHARE를 요청함
+ * 회원 행 잠금은 FOR NO KEY UPDATE({@link UserRepository#findForUpdate})라 이 요청과 충돌하지 않으므로,
+ * 회원 행을 잠그지 않는 대리 주문·취소가 옵션을 먼저 잡아도 고객 주문과 대기 순환이 생기지 않음
+ * 회원 행을 FOR UPDATE로 잠그면 이 순환이 생김(OrderLockOrderTest)
  */
 @Service
 @RequiredArgsConstructor
@@ -192,6 +197,8 @@ public class OrderService {
      * 4. 운영 기록 저장
      *
      * 새 주문 행은 커밋 전까지 이 트랜잭션에서만 보이므로 옵션을 먼저 잠가도 주문 → 옵션 잠금 순서와 충돌하지 않음
+     * 회원 행은 잠그지 않음, 주문 INSERT의 외래 키 검사가 고객의 회원 행에 FOR KEY SHARE를 요청하지만
+     * 같은 고객의 주문 생성이 쥔 FOR NO KEY UPDATE와 충돌하지 않아 옵션을 쥔 채 기다리지 않음
      *
      * @param actorUserId 주문을 만든 운영자 ID, 재고 이력의 작업자
      * @return 주문 상품·상태 이력·주문자를 포함한 주문
