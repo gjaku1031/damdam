@@ -19,8 +19,6 @@ API는 Spring Boot 4(Java 25)·JPA·jOOQ·Flyway로 구성하며 컨테이너 �
 - **응답 캐시**: API는 모든 응답에 `Cache-Control: no-store`를 기본으로 붙이고, 공개 사진 응답만 `public, max-age=86400`으로 바꿉니다. 운영 앞단의 Cloudflare는 캐시 지시가 없는 응답을 주소의 확장자만 보고 저장하므로(`/api/orders/me;a.jpg`처럼 `;` 뒤에 확장자를 붙이면 JSON 응답도 저장됨) 이 기본값이 빠지면 안 됩니다. 배포 후 `curl -sI 'https://<도메인>/api/products;check.jpg'`의 응답이 `cache-control: no-store`이고 `cf-cache-status`가 `HIT`이 아닌지 확인합니다. 선택 근거는 `docs/response-cache-tradeoffs.md`에 있습니다.
 - **명령**: 기본 데이터 준비는 `docker compose run --rm api seed`, 사진 변환본 일괄 생성은 `optimize-images`입니다.
 
-배포 전 PostgreSQL 덤프와 업로드 백업을 확보합니다.
-
 ## 최초 실행
 
 ```bash
@@ -46,10 +44,9 @@ bash scripts/deploy-server.sh
 docker compose ps
 docker compose logs --tail=100 api web
 docker compose restart api
-docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backups/postgres.sql
 ```
 
-백업 전 `mkdir -p backups`를 실행하고 접근 권한을 제한합니다. PostgreSQL(로그인 세션 포함)과 업로드 데이터는 이름 있는 볼륨에 남습니다. `docker compose down`은 볼륨을 유지하며 `down -v`는 데이터를 삭제하므로 데이터 초기화가 의도된 경우에만 사용합니다.
+PostgreSQL(로그인 세션 포함)과 업로드 데이터는 이름 있는 볼륨에 남습니다. DB와 업로드는 따로 백업하지 않으므로 볼륨이 지워지거나 서버 디스크가 손상되면 되살릴 수 없습니다. `docker compose down`은 볼륨을 유지하며 `down -v`는 데이터를 삭제하므로 데이터 초기화가 의도된 경우에만 사용합니다.
 
 ## 업데이트
 
@@ -58,4 +55,4 @@ git pull --ff-only
 bash scripts/deploy-server.sh
 ```
 
-업데이트 전 DB·업로드를 백업합니다. 스키마 변경이 포함된 버전의 롤백은 코드뿐 아니라 마이그레이션과 백업 복원 계획도 함께 검토합니다.
+스키마 변경이 포함된 버전의 롤백은 코드뿐 아니라 마이그레이션도 함께 검토합니다. 백업이 없으므로 마이그레이션이 지우거나 바꾼 데이터는 되돌릴 수 없습니다.
