@@ -11,10 +11,28 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
     env:
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
 
     steps:
+      # 배포할 커밋의 CI(push)가 성공했을 때만 진행. 실행 중이거나 실패했으면 서버에 닿기 전에 멈춤
+      - name: Require a successful CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          conclusion=$(gh run list --repo "${{ github.repository }}" --workflow ci.yml \
+            --commit "${{ github.sha }}" --event push --status completed \
+            --json conclusion --jq '.[0].conclusion // ""')
+          if [ "$conclusion" != "success" ]; then
+            echo "ERROR: CI has not succeeded for ${{ github.sha }} (latest completed run: ${conclusion:-none})." >&2
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
