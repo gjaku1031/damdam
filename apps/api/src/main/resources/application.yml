@@ -27,7 +27,7 @@ spring:
     jdbc:
       initialize-schema: never
   jackson:
-    # 선언하지 않은 입력 필드는 거부한다 (기존 forbidNonWhitelisted와 같은 정책)
+    # 선언하지 않은 입력 필드는 거부한다
     deserialization:
       fail-on-unknown-properties: true
       accept-float-as-int: false

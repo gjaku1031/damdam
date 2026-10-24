@@ -10,7 +10,7 @@ import lombok.Getter;
  * HTTP 상태와 사용자 메시지를 함께 담는 업무 예외
  *
  * {@link GlobalExceptionHandler}가 {@link ErrorResponse}로 변환
- * 메시지를 생략하면 예전 API와 같은 기본 문구({@code Not Found} 등 상태 이유 문구) 사용
+ * 메시지를 생략하면 상태 이유 문구({@code Not Found} 등)를 기본 문구로 사용
  */
 @Getter
 public final class ApiException extends RuntimeException {

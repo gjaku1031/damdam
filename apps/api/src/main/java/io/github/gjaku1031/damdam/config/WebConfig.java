@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * Spring MVC 설정
  *
- * 모든 컨트롤러를 {@code /api} 아래에 두고, 예전 Express API처럼 경로 대소문자를 구분하지 않음
+ * 모든 컨트롤러를 {@code /api} 아래에 두고, 경로의 대소문자를 구분하지 않음
  */
 @Configuration
 @RequiredArgsConstructor

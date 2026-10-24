@@ -31,7 +31,7 @@ import lombok.RequiredArgsConstructor;
  * 상품·고객·주문 목데이터는 만들지 않음
  *
  * <ul>
- *   <li>초기 운영자: {@code SEED_ADMIN_PASSWORD}가 있고 운영자가 없거나 예전 형식 해시일 때만 생성·갱신</li>
+ *   <li>초기 운영자: {@code SEED_ADMIN_PASSWORD}가 있고 운영자가 없거나 운영자의 해시가 Argon2id가 아닐 때만 생성·갱신</li>
  *   <li>무통장 입금 안내·사업자 정보·고객센터 설정(빈 값), 현재 필수 약관</li>
  * </ul>
  */

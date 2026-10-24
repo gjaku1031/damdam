@@ -188,7 +188,7 @@ public final class GlobalExceptionHandler {
     }
 
     /**
-     * 필드 경로를 예전 형식으로 변환
+     * 필드 경로를 웹이 쓰는 점 표기로 변환
      *
      * @param field 필드 오류
      * @return {@code items[0].quantity}를 바꾼 {@code items.0.quantity} 형식 경로

@@ -18,11 +18,6 @@ import { ProxyOrderForm } from './proxy-order-form'
 import { StatusBadge } from './ui-kit'
 import { formatDateTime } from './admin-nav'
 
-/** 예전 화면 호환용 상태 이름 */
-export const orderLabels: Record<string, string> = Object.fromEntries(
-  Object.entries(orderStatus).map(([key, value]) => [key, value.label]),
-)
-
 const dangerStatuses = new Set(['CANCELED', 'FULLY_REFUNDED'])
 
 /** 운영자가 입금 기한을 늘릴 수 있는 최대 일수 (API PaymentDeadlinePolicy.MAX_DAYS와 같음) */
