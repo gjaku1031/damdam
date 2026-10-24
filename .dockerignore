@@ -1,9 +1,6 @@
 .git
-.claude
 .pnpm-store
 .playwright
-.playwright-mcp
-.mcp.json
 **/node_modules
 **/.next
 **/dist

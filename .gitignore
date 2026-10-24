@@ -22,13 +22,6 @@ __pycache__/
 screenshots/
 design-samples/
 
-# Claude local-only state (may contain secrets; never commit)
-.claude/settings.local.json
-.claude/scheduled_tasks.lock
-
 # OS
 .DS_Store
 .env
-
-# Browser tool logs from local debugging
-.playwright-mcp/
