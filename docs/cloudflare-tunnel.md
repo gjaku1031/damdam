@@ -32,3 +32,5 @@ curl -sI 'https://damdamwood.co.kr/api/products;check.jpg'
 ```
 
 마지막 명령의 응답은 `cache-control: no-store`이고 `cf-cache-status`가 `HIT`이 아니어야 합니다.
+
+로그인 시도 제한은 API가 `X-Forwarded-For`의 마지막 주소로 방문자를 구분합니다. 터널이나 웹(Next.js)의 버전을 바꾸면, 공인 IP가 다른 두 곳에서 없는 아이디로 틀린 로그인을 보내 한쪽이 한도를 넘겨 429를 받은 뒤에도 다른 쪽이 401을 받는지 확인합니다. 2026-10-24에 이 방법으로 두 방문자가 따로 세어지는 것을 확인했고, 방문자가 `X-Forwarded-For`에 다른 주소를 적어 보내도 제한을 피하지 못했습니다. 방문자가 보낸 `CF-Connecting-IP`는 Cloudflare가 403으로 거절합니다.
