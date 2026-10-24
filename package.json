@@ -11,8 +11,5 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "seed": "bash scripts/seed.sh"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.58.2"
   }
 }

@@ -5,7 +5,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
-COPY packages/shared/package.json packages/shared/package.json
 COPY packages/ui/package.json packages/ui/package.json
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
@@ -41,7 +40,6 @@ ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/damdam-api.jar"]
 FROM dependencies AS web-build
 COPY tsconfig.base.json ./
 COPY apps/web ./apps/web
-COPY packages/shared ./packages/shared
 COPY packages/ui ./packages/ui
 ENV API_INTERNAL_URL=http://api:4000 NEXT_PUBLIC_API_BASE_URL=/api
 RUN --mount=type=secret,id=proxy_ca \

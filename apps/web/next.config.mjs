@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@damdam/ui', '@damdam/shared'],
+  transpilePackages: ['@damdam/ui'],
   output: 'standalone',
   // 사진은 API가 올릴 때 만들어 둔 세 벌(가로 400·800·1600px)을 그대로 씀.
   // 로더가 요청 폭을 세 벌 중 하나로 바꾸므로 후보 폭도 그 셋으로 맞춤
