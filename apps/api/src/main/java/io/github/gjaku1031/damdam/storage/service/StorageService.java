@@ -16,8 +16,6 @@ import static org.jooq.impl.DSL.selectOne;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -37,7 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import io.github.gjaku1031.damdam.common.error.ApiException;
-import io.github.gjaku1031.damdam.config.DamdamProperties;
 import io.github.gjaku1031.damdam.feed.domain.PostState;
 import io.github.gjaku1031.damdam.storage.domain.ImageVariant;
 import io.github.gjaku1031.damdam.storage.domain.StorageUploadTicketEntity;
@@ -140,11 +137,6 @@ public class StorageService {
     private final DSLContext dsl;
 
     /**
-     * 기존 정적 사진 경로 설정
-     */
-    private final DamdamProperties properties;
-
-    /**
      * 업로드 티켓 발급
      *
      * @param userId 발급받는 운영자 ID
@@ -209,17 +201,16 @@ public class StorageService {
     /**
      * 본문·상품에 연결할 사진 확인
      *
-     * 검증을 마친 업로드 사진이거나 상위 경로 이동이 없는 기존 정적 사진이어야 함
+     * 검증을 마친 업로드 사진이어야 함
      * 업로드 사진은 티켓을 공유 잠금으로 읽음. 사진을 연결하는 트랜잭션 안에서 호출하면 그 트랜잭션이 끝날 때까지
      * {@link #deleteIfOrphan}이 같은 사진을 지우지 못하고, 이미 지워진 사진이면 여기서 거부됨
      * 트랜잭션 밖에서 호출하면 잠금이 바로 풀리므로 사전 확인으로만 쓰고, 연결하는 트랜잭션 안에서 한 번 더 호출해야 함
      *
-     * @param key 업로드 사진 키 또는 {@code /images/...} 경로
+     * @param key 업로드 사진 키
      * @throws ApiException 검증을 마친 업로드가 아닐 때(400)
      */
     @Transactional
     public void assertUsable(String key) {
-        if (key.startsWith(ImageKeys.LEGACY_PREFIX) && !key.contains("..")) return;
         if (tickets.findForShare(key, StorageUploadTicketStatus.VERIFIED).isEmpty()) {
             throw ApiException.badRequest("완료된 업로드를 사용해주세요.");
         }
@@ -247,38 +238,6 @@ public class StorageService {
         try {
             return new StoredImage(files.read(key), ImageKeys.contentType(key), cacheable);
         } catch (IOException error) {
-            throw ApiException.notFound();
-        }
-    }
-
-    /**
-     * 웹 공개 폴더에서 옮겨 온 기존 사진({@code /images/...}) 조회
-     *
-     * @param filename {@code /images/} 아래 상대 경로
-     * @param userId 세션 사용자 ID, 비로그인이면 빈 값
-     * @param size 변환본 크기({@code s}·{@code m}·{@code l}), {@code null}이면 대
-     * @return 요청한 크기의 변환본, 변환본이 없는 사진은 원본
-     * @throws ApiException 파일명·크기 형식이 다르거나 기준 경로를 벗어나거나 접근할 수 없거나 파일이 없을 때(404)
-     */
-    @Transactional(readOnly = true)
-    public StoredImage legacyFile(String filename, Optional<UUID> userId, String size) {
-        // 파일명 형식·경로 이동 검사 후 접근 권한 확인
-        if (!ImageKeys.LEGACY_FILENAME.matcher(filename).matches() || filename.contains("..") || filename.startsWith("/")) {
-            throw ApiException.notFound();
-        }
-        ImageVariant variant = variantOf(size);
-        String key = ImageKeys.LEGACY_PREFIX + filename;
-        boolean cacheable = authorize(key, userId);
-        // 기준 경로 밖으로 벗어나는 경로 거부
-        Path root = Path.of(properties.storage().legacyImagesPath()).toAbsolutePath().normalize();
-        Path file = root.resolve(filename).normalize();
-        if (!file.startsWith(root)) throw ApiException.notFound();
-        Optional<byte[]> converted = variantBytes(key, variant);
-        if (converted.isPresent()) return new StoredImage(converted.get(), ImageKeys.VARIANT_CONTENT_TYPE, cacheable);
-        // 변환본이 없는 사진만 원본 제공
-        try {
-            return new StoredImage(Files.readAllBytes(file), ImageKeys.contentType(filename), cacheable);
-        } catch (IOException missing) {
             throw ApiException.notFound();
         }
     }
@@ -441,7 +400,7 @@ public class StorageService {
     /**
      * 저장된 변환본 읽기
      *
-     * @param key 업로드 사진 키 또는 {@code /images/...} 경로
+     * @param key 업로드 사진 키
      * @return 변환본 바이트, 변환본이 없거나 읽지 못하면 빈 값
      */
     private Optional<byte[]> variantBytes(String key, ImageVariant variant) {
@@ -461,7 +420,7 @@ public class StorageService {
      * 2. 삭제되지 않은 운영자면 통과
      * 3. 본인 주문 사용처가 있으면 통과
      *
-     * @param key 업로드 사진 키 또는 {@code /images/...} 경로
+     * @param key 업로드 사진 키
      * @param userId 세션 사용자 ID, 비로그인이면 빈 값
      * @return 공개 사용처에 쓰인 사진이면 참, 운영자·본인 주문으로만 볼 수 있는 사진이면 거짓
      * @throws ApiException 접근할 수 없을 때(404)

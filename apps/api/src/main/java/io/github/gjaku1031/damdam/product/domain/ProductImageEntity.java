@@ -25,7 +25,7 @@ public class ProductImageEntity extends BaseEntity {
     private UUID productId;
 
     /**
-     * 저장 키, 업로드 사진({@code product/<uuid>.<ext>}) 또는 기존 정적 사진({@code /images/...})
+     * 업로드 사진 저장 키({@code product/<uuid>.<ext>})
      */
     @Column(nullable = false, length = 500)
     private String objectKey;

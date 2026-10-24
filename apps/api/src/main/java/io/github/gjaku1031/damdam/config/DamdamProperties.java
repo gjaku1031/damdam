@@ -24,7 +24,6 @@ public record DamdamProperties(String webOrigin, boolean trustProxy, Seed seed, 
      * 사진 저장 경로 설정
      *
      * @param localPath 업로드 사진 저장 디렉터리
-     * @param legacyImagesPath 기존 정적 사진 디렉터리
      */
-    public record Storage(String localPath, String legacyImagesPath) {}
+    public record Storage(String localPath) {}
 }

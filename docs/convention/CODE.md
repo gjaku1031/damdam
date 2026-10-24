@@ -72,7 +72,7 @@ Java API(`apps/api`)의 접근 범위·생성자 주입·JPA 엔티티·jOOQ·nu
 
 ## 사진 저장과 제공
 
-- 사진 키(`product/<uuid>.jpg`, `/images/...`)는 원본을 가리키며 DB에는 이 키만 저장. 크기별 변환본(`ImageVariant`)은 `ImageKeys.variantKey`의 이름 규칙으로 찾고 DB에 목록을 두지 않음.
+- 사진 키(`product/<uuid>.jpg`)는 원본을 가리키며 DB에는 이 키만 저장. 크기별 변환본(`ImageVariant`)은 `ImageKeys.variantKey`의 이름 규칙으로 찾고 DB에 목록을 두지 않음.
 - 원본에는 촬영 위치 등 메타데이터가 남아 있으므로 변환본이 있는 사진의 원본을 응답으로 내보내지 않음. 원본 제공은 변환본이 없는 사진의 대체 경로에만 사용.
 - 사진 변환(`ImageConverter`)은 DB 트랜잭션과 행 잠금 밖에서 수행. 변환이 끝난 뒤 짧은 트랜잭션에서 다시 확인하고 저장.
 - 캐시 허용은 `StorageService`가 공개 사용처로 판정한 응답에만 적용. 운영자·본인 주문으로만 볼 수 있는 사진은 `no-store` 유지.

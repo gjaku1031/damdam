@@ -100,20 +100,6 @@ public final class StorageController {
     }
 
     /**
-     * 기존 정적 사진 제공
-     *
-     * @param path {@code /images/} 아래 경로, 앞의 {@code /}는 제거해 사용
-     * @param size 변환본 크기, 생략하면 대
-     * @return 공개 사진은 캐시 허용, 그 외에는 저장 금지 정책의 사진 응답
-     */
-    @GetMapping("/legacy-files/{*path}")
-    public ResponseEntity<byte[]> legacyFile(@PathVariable String path,
-            @RequestParam(value = "size", required = false) String size, HttpServletRequest request) {
-        String filename = path.startsWith("/") ? path.substring(1) : path;
-        return image(storage.legacyFile(filename, SessionUser.id(request), size));
-    }
-
-    /**
      * 사진 응답 조립
      *
      * 공개 사용처에 쓰인 사진만 하루 동안 공용 캐시를 허용하고, 운영자·본인 주문으로만 볼 수 있는 사진은 저장 금지

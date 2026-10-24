@@ -15,11 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       ? {
           title: post.title,
           description: post.excerpt,
-          images: [
-            post.coverObjectKey.startsWith('/images/')
-              ? post.coverObjectKey
-              : '/api/storage/files/' + post.coverObjectKey.replace(/^\//, ''),
-          ],
+          images: ['/api/storage/files/' + post.coverObjectKey.replace(/^\//, '')],
         }
       : undefined,
   }

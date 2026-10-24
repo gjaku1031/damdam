@@ -20,6 +20,11 @@ final class PostDocumentsTest {
     private static final String KEY = "post/6c40f107-0254-4e7e-97a5-dc2c2788c3c0.png";
 
     /**
+     * 두 번째 업로드 사진 키 예시
+     */
+    private static final String OTHER_KEY = "post/0b5d3f7a-9c1e-4d2b-8a6f-3e7c1b9d5a20.jpg";
+
+    /**
      * 문서 JSON 해석기
      */
     private final ObjectMapper json = new ObjectMapper();
@@ -55,26 +60,29 @@ final class PostDocumentsTest {
     void rendersImagesAndCollectsKeysInOrder() {
         JsonNode document = document("""
                 {"type":"image","attrs":{"src":"/api/storage/files/%s","objectKey":"%s","width":50,"align":"center","caption":""}},
-                {"type":"image","attrs":{"src":"/images/chair.jpg","width":100,"align":"center","caption":""}},
+                {"type":"image","attrs":{"objectKey":"%s","width":100,"align":"center","caption":""}},
                 {"type":"image","attrs":{"src":"/api/storage/files/%s","width":100,"align":"center","caption":""}}"""
-                .formatted(KEY, KEY, KEY));
+                .formatted(KEY, KEY, OTHER_KEY, KEY));
 
-        assertThat(PostDocuments.imageKeys(document)).containsExactly(KEY, "/images/chair.jpg");
+        assertThat(PostDocuments.imageKeys(document)).containsExactly(KEY, OTHER_KEY);
         assertThat(PostDocuments.render(document)).contains("src=\"/api/storage/files/" + KEY + "\"")
-                .contains("src=\"/images/chair.jpg\"");
+                .contains("src=\"/api/storage/files/" + OTHER_KEY + "\"");
     }
 
     /**
-     * 업로드 사진도 기존 정적 사진도 아닌 주소의 사진은 400
+     * 업로드 사진이 아닌 주소(외부 주소, 웹 정적 경로, 상위 경로 이동)의 사진은 400
      */
     @Test
     void rejectsImagesFromOtherSources() {
         JsonNode external = document("""
                 {"type":"image","attrs":{"src":"https://evil.example/track.png","width":100,"align":"center","caption":""}}""");
+        JsonNode staticPath = document("""
+                {"type":"image","attrs":{"src":"/images/chair.jpg","width":100,"align":"center","caption":""}}""");
         JsonNode traversal = document("""
-                {"type":"image","attrs":{"src":"/images/../../etc/passwd.png","width":100,"align":"center","caption":""}}""");
+                {"type":"image","attrs":{"src":"/api/storage/files/post/../../etc/passwd.png","width":100,"align":"center","caption":""}}""");
 
         assertBadRequest(() -> PostDocuments.imageKeys(external));
+        assertBadRequest(() -> PostDocuments.imageKeys(staticPath));
         assertBadRequest(() -> PostDocuments.imageKeys(traversal));
     }
 
@@ -83,7 +91,7 @@ final class PostDocumentsTest {
      */
     @Test
     void rejectsMoreThanTwentyImages() {
-        String image = "{\"type\":\"image\",\"attrs\":{\"src\":\"/images/a%d.jpg\",\"width\":100,\"align\":\"center\",\"caption\":\"\"}}";
+        String image = "{\"type\":\"image\",\"attrs\":{\"objectKey\":\"post/00000000-0000-4000-8000-0000000000%02d.jpg\",\"width\":100,\"align\":\"center\",\"caption\":\"\"}}";
         StringBuilder nodes = new StringBuilder();
         for (int index = 0; index < 21; index++) nodes.append(index == 0 ? "" : ",").append(image.formatted(index));
 

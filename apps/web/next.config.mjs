@@ -27,21 +27,12 @@ const nextConfig = {
     ]
   },
   async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: '/images/:path*',
-          destination: `${process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000'}/api/storage/legacy-files/:path*`,
-        },
-      ],
-      afterFiles: [
-        {
-          source: '/api/:path*',
-          destination: `${process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000'}/api/:path*`,
-        },
-      ],
-      fallback: [],
-    }
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000'}/api/:path*`,
+      },
+    ]
   },
 }
 

@@ -88,7 +88,6 @@ public abstract class IntegrationTest {
     @DynamicPropertySource
     static void storage(DynamicPropertyRegistry registry) {
         registry.add("damdam.storage.local-path", UPLOADS::toString);
-        registry.add("damdam.storage.legacy-images-path", () -> UPLOADS.resolve("legacy-source").toString());
     }
 
     /**

@@ -1,6 +1,5 @@
 package io.github.gjaku1031.damdam.feed.repository;
 
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,13 +12,6 @@ import io.github.gjaku1031.damdam.feed.domain.FeedPostImageEntity;
  * 발행 게시글 사진 목록 저장소
  */
 public interface FeedPostImageRepository extends JpaRepository<FeedPostImageEntity, UUID> {
-    /**
-     * 게시글 사진 목록 조회
-     *
-     * @return 본문 등장 순서
-     */
-    List<FeedPostImageEntity> findByPostIdOrderBySortOrderAsc(UUID postId);
-
     /**
      * 게시글 사진 목록 즉시 삭제
      *

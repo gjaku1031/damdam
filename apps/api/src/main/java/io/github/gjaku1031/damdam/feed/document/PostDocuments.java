@@ -103,10 +103,10 @@ public final class PostDocuments {
     /**
      * 문서의 사진 저장 키 목록
      *
-     * {@code objectKey}가 없으면 {@code src}의 파일 API 주소나 기존 정적 사진 주소에서 키를 구함
+     * {@code objectKey}가 없으면 {@code src}의 파일 API 주소에서 키를 구함
      *
      * @return 등장 순서의 중복 없는 키
-     * @throws ApiException 업로드·기존 정적 사진이 아닌 주소가 있거나 20장을 넘을 때(400)
+     * @throws ApiException 업로드 사진이 아닌 주소가 있거나 20장을 넘을 때(400)
      */
     public static List<String> imageKeys(JsonNode document) {
         List<String> keys = new ArrayList<>();
@@ -180,7 +180,7 @@ public final class PostDocuments {
             String objectKey = attrs == null ? "" : jsString(attrs.get("objectKey"), "");
             String key = !objectKey.isEmpty() ? objectKey
                     : src.startsWith(ImageKeys.FILE_URL_PREFIX) ? src.substring(ImageKeys.FILE_URL_PREFIX.length()) : src;
-            if (!ImageKeys.ATTACHABLE.matcher(key).matches() || key.contains("..")) {
+            if (!ImageKeys.UPLOADED.matcher(key).matches()) {
                 throw ApiException.badRequest("업로드한 사진만 본문에 넣을 수 있습니다.");
             }
             keys.add(key);

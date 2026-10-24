@@ -193,7 +193,6 @@ function OrderRow({
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={order.status} />
             {dueBadge && <span className={`badge ${dueBadge.tone}`}>{dueBadge.label}</span>}
-            {order.orderNo.startsWith('DEMO-') && <span className="badge">체험용</span>}
           </span>
           <span className="truncate text-[15px] font-semibold">{itemSummary(order)}</span>
           <span className="truncate text-[13px] text-muted-foreground">

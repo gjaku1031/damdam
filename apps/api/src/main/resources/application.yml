@@ -62,4 +62,3 @@ damdam:
     admin-password: ${SEED_ADMIN_PASSWORD:}
   storage:
     local-path: ${STORAGE_LOCAL_PATH:./uploads}
-    legacy-images-path: ${STORAGE_LEGACY_IMAGES_PATH:./legacy-images}

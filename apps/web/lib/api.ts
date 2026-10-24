@@ -114,9 +114,7 @@ export type ImageSize = 's' | 'm' | 'l'
  * 크기가 고정된 작은 `<img>` 썸네일은 `'s'`를 직접 지정함.
  */
 export function storageUrl(key: string, size?: ImageSize) {
-  const url = key.startsWith('/images/')
-    ? key
-    : API_BASE + '/storage/files/' + key.replace(/^\//, '')
+  const url = API_BASE + '/storage/files/' + key.replace(/^\//, '')
   return size ? `${url}?size=${size}` : url
 }
 export interface ApiProductVariant {

@@ -67,19 +67,6 @@ public class UserEntity extends SoftDeletableEntity {
     }
 
     /**
-     * 정해진 ID로 계정 생성
-     *
-     * 체험 고객처럼 재실행해도 같은 계정을 가리켜야 할 때 사용
-     *
-     * @return 저장 전 계정
-     */
-    public static UserEntity createWithId(UUID id, String username, String passwordHash, UserRole role) {
-        UserEntity user = create(username, passwordHash, role);
-        user.assignId(id);
-        return user;
-    }
-
-    /**
      * 운영자 여부
      *
      * @return 운영자면 {@code true}

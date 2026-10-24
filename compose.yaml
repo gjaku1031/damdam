@@ -39,7 +39,6 @@ services:
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       STORAGE_LOCAL_PATH: /app/uploads
-      STORAGE_LEGACY_IMAGES_PATH: /app/legacy-images
     volumes:
       - uploads:/app/uploads
     depends_on:

@@ -24,11 +24,11 @@ final class HtmlSanitizerTest {
     @Test
     void stripsEventHandlersAndUnknownAttributes() {
         String cleaned = HtmlSanitizer.clean("<p onclick=\"steal()\" class=\"x\" id=\"y\">글</p>"
-                + "<img src=\"/images/a.jpg\" onerror=\"steal()\" alt=\"사진\">");
+                + "<img src=\"/api/storage/files/post/6c40f107-0254-4e7e-97a5-dc2c2788c3c0.jpg\" onerror=\"steal()\" alt=\"사진\">");
 
         assertThat(cleaned).doesNotContain("onclick").doesNotContain("onerror").doesNotContain("steal")
                 .doesNotContain("class=").doesNotContain("id=");
-        assertThat(cleaned).contains("src=\"/images/a.jpg\"").contains("alt=\"사진\"");
+        assertThat(cleaned).contains("src=\"/api/storage/files/post/6c40f107-0254-4e7e-97a5-dc2c2788c3c0.jpg\"").contains("alt=\"사진\"");
     }
 
     /**
@@ -65,7 +65,7 @@ final class HtmlSanitizerTest {
     @Test
     void keepsOnlyAllowedStyleDeclarations() {
         String cleaned = HtmlSanitizer.clean("<p style=\"text-align:center; position:fixed; background:url(x)\">가운데</p>"
-                + "<img src=\"/images/a.jpg\" style=\"width:50%; width:33%; height:auto\">");
+                + "<img src=\"/api/storage/files/post/6c40f107-0254-4e7e-97a5-dc2c2788c3c0.jpg\" style=\"width:50%; width:33%; height:auto\">");
 
         assertThat(cleaned).contains("text-align").contains("center").doesNotContain("position").doesNotContain("url(");
         assertThat(cleaned).contains("50%").doesNotContain("33%");

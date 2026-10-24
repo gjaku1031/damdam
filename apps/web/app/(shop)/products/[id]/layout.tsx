@@ -27,9 +27,7 @@ export async function generateMetadata({
       openGraph: {
         title: product.name,
         description,
-        images: cover
-          ? [cover.startsWith('/images/') ? cover : '/api/storage/files/' + cover.replace(/^\//, '')]
-          : undefined,
+        images: cover ? ['/api/storage/files/' + cover.replace(/^\//, '')] : undefined,
       },
     }
   } catch {

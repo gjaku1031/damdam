@@ -32,11 +32,10 @@ ENV HOST=0.0.0.0 PORT=4000
 RUN apt-get update && apt-get install -y --no-install-recommends curl libvips-tools && rm -rf /var/lib/apt/lists/* \
     && vips --version
 COPY --from=api-build /src/apps/api/build/libs/damdam-api.jar ./damdam-api.jar
-COPY --chown=1000:1000 apps/web/public/images ./legacy-images
 RUN mkdir /app/uploads && chown 1000:1000 /app/uploads
 USER 1000:1000
 EXPOSE 4000
-# 인자 없이 서버 실행, `seed`·`seed-demo --apply`는 일회성 명령
+# 인자 없이 서버 실행, `seed`·`optimize-images`는 일회성 명령
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/damdam-api.jar"]
 
 FROM dependencies AS web-build

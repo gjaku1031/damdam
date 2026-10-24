@@ -11,27 +11,18 @@ import io.github.gjaku1031.damdam.storage.domain.ImageVariant;
  */
 final class ImageKeysTest {
     /**
-     * 업로드 사진 키는 {@code post|product/<uuid>.<확장자>}만 허용, 경로 이동이나 다른 폴더는 거부
+     * 업로드 사진 키는 {@code post|product/<uuid>.<확장자>}만 허용, 경로 이동·다른 폴더·외부 주소는 거부
      */
     @Test
     void uploadedKeyMustBeDomainUuidAndImageExtension() {
         assertThat(matchesUploaded("product/4f47b3c4-1516-4698-90db-7f4aeeb51b14.jpg")).isTrue();
         assertThat(matchesUploaded("post/6c40f107-0254-4e7e-97a5-dc2c2788c3c0.PNG")).isTrue();
         assertThat(matchesUploaded("product/4f47b3c4-1516-4698-90db-7f4aeeb51b14-s.webp")).as("변환본 파일 이름").isFalse();
-        assertThat(matchesUploaded("legacy/a.jpg")).isFalse();
         assertThat(matchesUploaded("product/../secret.jpg")).isFalse();
         assertThat(matchesUploaded("product/4f47b3c4-1516-4698-90db-7f4aeeb51b14.gif")).isFalse();
-    }
-
-    /**
-     * 본문에는 업로드 사진과 기존 정적 사진({@code /images/...})만 넣을 수 있고 외부 주소는 거부
-     */
-    @Test
-    void attachableKeyAllowsUploadsAndLegacyImagesOnly() {
-        assertThat(ImageKeys.ATTACHABLE.matcher("post/6c40f107-0254-4e7e-97a5-dc2c2788c3c0.png").matches()).isTrue();
-        assertThat(ImageKeys.ATTACHABLE.matcher("/images/products/chair.jpg").matches()).isTrue();
-        assertThat(ImageKeys.ATTACHABLE.matcher("https://evil.example/a.jpg").matches()).isFalse();
-        assertThat(ImageKeys.ATTACHABLE.matcher("/api/admin/orders").matches()).isFalse();
+        assertThat(matchesUploaded("/images/products/chair.jpg")).as("웹 정적 경로").isFalse();
+        assertThat(matchesUploaded("https://evil.example/a.jpg")).isFalse();
+        assertThat(matchesUploaded("/api/admin/orders")).isFalse();
     }
 
     /**
@@ -47,22 +38,12 @@ final class ImageKeysTest {
     }
 
     /**
-     * 기존 정적 사진의 변환본은 {@code legacy/} 아래에 원래 확장자를 남겨, 확장자만 다른 파일끼리 겹치지 않음
+     * 업로드 사진은 파일 API 주소로 내보냄
      */
     @Test
-    void variantKeyOfLegacyImageKeepsOriginalExtension() {
-        assertThat(ImageKeys.variantKey("/images/chair.jpg", ImageVariant.SMALL)).isEqualTo("legacy/chair.jpg-s.webp");
-        assertThat(ImageKeys.variantKey("/images/chair.png", ImageVariant.SMALL)).isEqualTo("legacy/chair.png-s.webp");
-    }
-
-    /**
-     * 업로드 사진은 파일 API 주소로, 기존 정적 사진은 경로 그대로 내보냄
-     */
-    @Test
-    void publicUrlPrefixesUploadsOnly() {
+    void publicUrlPrefixesFileApi() {
         assertThat(ImageKeys.publicUrl("post/6c40f107-0254-4e7e-97a5-dc2c2788c3c0.png"))
                 .isEqualTo("/api/storage/files/post/6c40f107-0254-4e7e-97a5-dc2c2788c3c0.png");
-        assertThat(ImageKeys.publicUrl("/images/chair.jpg")).isEqualTo("/images/chair.jpg");
     }
 
     /**

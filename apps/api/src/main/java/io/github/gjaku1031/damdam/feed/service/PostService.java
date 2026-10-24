@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import io.github.gjaku1031.damdam.common.error.ApiException;
 import io.github.gjaku1031.damdam.common.web.ItemPage;
 import io.github.gjaku1031.damdam.common.web.Paging;
-import io.github.gjaku1031.damdam.feed.document.LegacyHtmlConverter;
 import io.github.gjaku1031.damdam.feed.document.PostDocuments;
 import io.github.gjaku1031.damdam.feed.domain.FeedPostImageEntity;
 import io.github.gjaku1031.damdam.feed.domain.PostCategoryEntity;
@@ -201,9 +200,7 @@ public class PostService {
     @Transactional
     public DraftView create(UUID authorUserId) {
         // 본문은 빈 문단 하나, 공개 전까지 숨김
-        ObjectNode document = json.createObjectNode().put("type", "doc");
-        document.putArray("content").addObject().put("type", "paragraph");
-        ObjectNode draft = draftNode("", document, json.createArrayNode(), null, null);
+        ObjectNode draft = draftNode("", emptyDocument(), json.createArrayNode(), null, null);
         Instant now = Instant.now();
         UUID id = UUID.randomUUID();
         dsl.insertInto(ADMIN_UPDATES)
@@ -404,9 +401,8 @@ public class PostService {
         String draftCover = draft == null ? null : text(draft.get("coverObjectKey"));
         String excerpt = SPACES.matcher(TAGS.matcher(post.getBodyhtml()).replaceAll(" ")).replaceAll(" ").trim();
 
-        // 문서 JSON이 없는 기존 글은 기존 HTML을 변환해 렌더링
-        String bodyHtml = summary ? null
-                : post.getDocumentjson() != null ? post.getBodyhtml() : PostDocuments.render(publishedDocument(post));
+        // 발행할 때 문서와 함께 저장한 HTML, 발행 전이면 빈 문자열
+        String bodyHtml = summary ? null : post.getBodyhtml();
         return new PostView(post.getId(),
                 draftTitle != null ? draftTitle : post.getTitle(),
                 excerpt.length() > 140 ? excerpt.substring(0, 140) : excerpt,
@@ -450,13 +446,21 @@ public class PostService {
     /**
      * 발행 문서
      *
-     * @return 저장된 문서 JSON, 없으면 기존 HTML과 사진 목록을 변환한 문서
+     * @return 저장된 문서 JSON, 발행한 적 없는 글이면 빈 문서
      */
     private JsonNode publishedDocument(AdminUpdatesRecord post) {
-        if (post.getDocumentjson() != null) return read(post.getDocumentjson());
-        List<String> attached = images.findByPostIdOrderBySortOrderAsc(post.getId()).stream()
-                .map(FeedPostImageEntity::getObjectKey).toList();
-        return LegacyHtmlConverter.convert(post.getBodyhtml(), attached);
+        return post.getDocumentjson() != null ? read(post.getDocumentjson()) : emptyDocument();
+    }
+
+    /**
+     * 빈 문서
+     *
+     * @return 빈 문단 하나만 든 TipTap 문서
+     */
+    private ObjectNode emptyDocument() {
+        ObjectNode document = json.createObjectNode().put("type", "doc");
+        document.putArray("content").addObject().put("type", "paragraph");
+        return document;
     }
 
     /**
