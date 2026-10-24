@@ -29,3 +29,6 @@ design-samples/
 # OS
 .DS_Store
 .env
+
+# Browser tool logs from local debugging
+.playwright-mcp/
